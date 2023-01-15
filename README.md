@@ -63,6 +63,43 @@ generates those combinations for you, and you want to request all those
 values to be measured, without having to do the actual measurement
 immediately.
 
+```sql
+CREATE EXTENSION timemit;
+
+--
+-- Cannot use temp schema for wrapper functions since timeit.work()
+-- will run the jobs in a different session, so use public
+--
+CREATE FUNCTION numeric_sqrt_volatile(numeric)
+    RETURNS numeric
+    LANGUAGE internal
+    AS 'numeric_sqrt';
+
+--
+-- Spawn 131072 measurements of sqrt(2e0)...sqrt(2e131071)
+--
+SELECT count(timeit.async('numeric_sqrt_volatile($1)',ARRAY['numeric'],ARRAY[format('2e%s',exp)]))
+FROM generate_series(0,131071) AS exp;
+ count
+--------
+ 131072
+(1 row)
+
+--
+-- The pg-timeit-worker daemon will process the tests one by one.
+--
+-- Query to check the progress:
+--
+
+SELECT test_state, count(*) FROM timeit.tests GROUP BY 1 ORDER BY 1;
+ test_state | count
+------------+--------
+ init       | 115553
+ run_test_1 |  15519
+(2 rows)
+```
+
+
 Another nice thing with `timeit.async()` and `timeit.work()` is that they
 spread out the actual measurements over time, by first doing one measurement,
 and then instead of immediately proceeding an doing a second measurement
@@ -104,9 +141,7 @@ Here is how to do that on Ubuntu Linux:
 
 Here is how to do that on Mac OS X:
 
-    $ sudo cp pg-timeit-worker.sh /usr/local/bin/
-    $ sudo cp pg-timeit-worker.plist ~/Library/LaunchAgents/
-    $ launchctl load ~/Library/LaunchAgents/pg-timeit-worker.plist
+    $ ./add-pg-timeit-worker-to-launchd.sh
 
 <h2 id="usage">4. Usage</h2>
 
