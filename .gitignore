@@ -3,3 +3,4 @@ regression.diffs
 regression.out
 results
 timeit--*.sql
+pg-timeit-worker.log
