@@ -35,6 +35,24 @@ increased until the final result has the desired number of signifiant figures.
 `timeit.now()` immediately measures the execution time for an expression,
 suitable when you simply want to do a single measurement.
 
+```sql
+CREATE EXTENSION timemit;
+
+CREATE FUNCTION pg_temp.numeric_sqrt_volatile(numeric)
+    RETURNS numeric
+    LANGUAGE internal
+    AS 'numeric_sqrt';
+
+SELECT timeit.now('pg_temp.numeric_sqrt_volatile(2)');
+    now
+-----------
+ 0.0000002
+(1 row)
+--
+-- 0.0000002 s = 200 ns
+--
+```
+
 `timeit.async()` defers the measurement and just returns an `id`, that the
 caller can keep to allow the `final_result` to be joined in later
 when the execution time has been computed by the `timeit.work()` `PROCEDURE`.
@@ -73,6 +91,22 @@ Install the `timeit` extension with:
     $ make
     $ sudo make install
     $ make installcheck
+
+Optionally, if you need `timeit.async()`, you also need to schedule
+the `timeit.work()` procedure to run in the background.
+
+Here is how to do that on Ubuntu Linux:
+
+    $ sudo cp pg-timeit-worker.sh /usr/local/bin/
+    $ sudo cp pg-timeit.service /etc/systemd/system/
+    $ sudo systemctl enable pg-timeit
+    $ sudo systemctl start pg-timeit
+
+Here is how to do that on Mac OS X:
+
+    $ sudo cp pg-timeit-worker.sh /usr/local/bin/
+    $ sudo cp pg-timeit-worker.plist ~/Library/LaunchAgents/
+    $ launchctl load ~/Library/LaunchAgents/pg-timeit-worker.plist
 
 <h2 id="usage">4. Usage</h2>
 
@@ -120,6 +154,18 @@ Immediately measure the execution run time of `test_expression` and produce a re
 Request measurement of the execution run time of `test_expression`.
 
 Returns a bigint `id` value that is the primary key in the `timeit.tests` table where the requested test is stored to.
+
+<h3 id="timeit-now"><code>timeit.work()</code></h3>
+
+This procedure performs the measurements requested by `timeit.async()` and is supposed to be called in a loop from a script or cronjob.
+
+```sql
+CALL timeit.work();
+```
+
+```sh
+while true ; do psql -c "CALL timeit.work()" ; sleep 1 ; done
+```
 
 <h2 id="api">6. Internal types</h2>
 

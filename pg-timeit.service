@@ -1,0 +1,10 @@
+Description=pg-timeit worker
+After=pg-timeit.service
+
+[Service]
+User=postgres
+ExecStart=/usr/local/bin/pg-timeit-worker.sh
+ExecReload=/bin/kill -SIGUSR1 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
