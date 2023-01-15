@@ -214,19 +214,19 @@ See the [Installation](#installation) section for how to daemonize it.
 Round `numeric` value to `integer` number of significant figures.
 
 ```sql
-l=# SELECT timeit.round_to_sig_figs(1234,2);
+SELECT timeit.round_to_sig_figs(1234,2);
  round_to_sig_figs
 -------------------
               1200
 (1 row)
 
-=# SELECT timeit.round_to_sig_figs(12.456,3);
+SELECT timeit.round_to_sig_figs(12.456,3);
  round_to_sig_figs
 -------------------
               12.5
 (1 row)
 
-=# SELECT timeit.round_to_sig_figs(0.00012456,3);
+SELECT timeit.round_to_sig_figs(0.00012456,3);
  round_to_sig_figs
 -------------------
           0.000125
@@ -388,7 +388,7 @@ immutable expression, and use the volatile version we created earlier.
 Let's measure the overhead time of generate_series:
 
 ```sql
-=# SELECT count(null) FROM generate_series(1,1e8);
+SELECT count(null) FROM generate_series(1,1e8);
  count
 -------
      0
@@ -402,7 +402,7 @@ since it's only computed once, and that time is minuscule in relation to
 the time to generate the 1e8 long series:
 
 ```sql
-=# SELECT count(1.5 + 2.5) FROM generate_series(1,1e8);
+SELECT count(1.5 + 2.5) FROM generate_series(1,1e8);
    count
 -----------
  100000000
@@ -416,7 +416,7 @@ takes about 3 seconds longer time, which nicely matches the `timeit.now()`
 returned result:
 
 ```sql
-=# SELECT count(pg_temp.numeric_add_volatile(1.5, 2.5)) FROM generate_series(1,1e8);
+SELECT count(pg_temp.numeric_add_volatile(1.5, 2.5)) FROM generate_series(1,1e8);
    count
 -----------
  100000000
