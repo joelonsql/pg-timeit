@@ -1,0 +1,27 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS timeit;
+SELECT timeit.now('pg_sleep(0.05)');
+ now  
+------
+ 0.05
+(1 row)
+
+SELECT timeit.now('pg_sleep(0.1)', 2);
+ now  
+------
+ 0.10
+(1 row)
+
+SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.13}');
+ now 
+-----
+ 0.1
+(1 row)
+
+SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.13}', 2);
+ now  
+------
+ 0.13
+(1 row)
+
+ROLLBACK;

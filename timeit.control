@@ -1,0 +1,5 @@
+comment = 'measure runtime of expressions'
+default_version = '1.0'
+relocatable = false
+schema = timeit
+superuser = false
