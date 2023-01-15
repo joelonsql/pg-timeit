@@ -7,7 +7,14 @@
 5. [API](#api)
     1. [timeit.now()]
     2. [timeit.async()]
-6. [Examples](#examples)
+    3. [timeit.work()]
+6. [Internal types](#internal-types)
+    1. [test_state]
+7. [Internal functions](#internal-functions)
+    1. [timeit.round_to_sig_figs()]
+    2. [timeit.create_or_lookup_function()]
+    3. [timeit.measure()]
+8. [Examples](#examples)
 
 [timeit.now()]: #timeit-now
 [timeit.async()]: #timeit-async
@@ -114,7 +121,65 @@ Request measurement of the execution run time of `test_expression`.
 
 Returns a bigint `id` value that is the primary key in the `timeit.tests` table where the requested test is stored to.
 
-<h2 id="api">6. Examples</h2>
+<h2 id="api">6. Internal types</h2>
+
+<h3 id="test-state"><code>test_state</code></h3>
+
+`timeit.test_state` is an `ENUM` with the following elements:
+
+- **init**: Test has just been initiated.
+- **run_test_1**: First test should be executed.
+- **run_test_2**: Second test should be executed.
+- **final**: The final result has been determined.
+
+<h2 id="internal-functions">7. Internal functions</h2>
+
+<h3 id="timeit-round-to-sig-figs"><code>timeit.round_to_sig_figs(numeric, integer) → numeric</code></h3>
+
+Round `numeric` value to `integer` number of significant figures.
+
+```sql
+l=# SELECT timeit.round_to_sig_figs(1234,2);
+ round_to_sig_figs
+-------------------
+              1200
+(1 row)
+
+=# SELECT timeit.round_to_sig_figs(12.456,3);
+ round_to_sig_figs
+-------------------
+              12.5
+(1 row)
+
+=# SELECT timeit.round_to_sig_figs(0.00012456,3);
+ round_to_sig_figs
+-------------------
+          0.000125
+(1 row)
+
+```
+
+<h3 id="timeit-create-or-lookup-function"><code>timeit.create_or_lookup_function(argtypes text[], function_definition text, rettype text) → text</code></h3>
+
+Create a temp function with taking `argtypes` as input, defined as
+`function_definition` returning `rettype` and return the function name.
+
+The function name is the hash of the input parameters, a concept sometimes
+referred to has "content-addressed naming". This idea is inspired by the
+Unison language.
+
+It avoids the risk of conflicts and the need to recreate the same function.
+
+Thanks to this concept, the same function can be reused if needed by other
+tests, which reduces the bloat caused by the temp functions.
+
+<h3 id="timeit-measure"><code>timeit.measure(test_expression text, input_types text[], input_values text[], executions bigint) -> numeric</code></h3>
+
+Performs `executions` number of executions of `test_expression` with arguments passed via `input_types` and `input_values`.
+
+`input_types` and `input_values` can be empty arrays if the arguments are already contained in the `test_expression`.
+
+<h2 id="api">8. Examples</h2>
 
 Let's say we want to measure the execution time of
 
