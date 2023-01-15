@@ -44,6 +44,13 @@ begin
     --
     overhead_expression := '1';
 
+    --
+    -- We first want to get a rough idea of how long time a single overhead
+    -- operation and a single test expression takes. This will help us
+    -- scale up the initial number of executions to something reasonable,
+    -- instead of starting at 1.
+    --
+
     base_overhead_time := timeit.measure('1', input_types, input_values, 1);
     base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
 
@@ -72,10 +79,12 @@ begin
             if timeit.round_to_sig_figs(net_time_1, significant_figures)
              = timeit.round_to_sig_figs(net_time_2, significant_figures)
             then
+
                 final_result := timeit.round_to_sig_figs(
                     (net_time_1 + net_time_2) / (2 * executions)::numeric,
                     significant_figures
                 );
+
                 return final_result;
 
             end if;
