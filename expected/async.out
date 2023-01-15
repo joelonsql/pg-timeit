@@ -17,6 +17,7 @@ FROM timeit.tests;
 (1 row)
 
 CALL timeit.work();
+NOTICE:  test id 1 initialized
 SELECT
     id,
     test_state,
@@ -41,6 +42,7 @@ FROM timeit.tests;
 (1 row)
 
 CALL timeit.work();
+NOTICE:  test id 1 finalized
 SELECT
     id,
     test_state,
