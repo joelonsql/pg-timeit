@@ -194,13 +194,7 @@ Returns a bigint `id` value that is the primary key in the `timeit.tests` table 
 
 This procedure performs the measurements requested by `timeit.async()` and is supposed to be called in a loop from a script or cronjob.
 
-```sql
-CALL timeit.work();
-```
-
-```sh
-while true ; do psql -c "CALL timeit.work()" ; sleep 1 ; done
-```
+See the [Installation](#installation) section for how to daemonize it.
 
 <h2 id="api">6. Internal types</h2>
 
