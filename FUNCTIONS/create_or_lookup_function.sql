@@ -23,11 +23,11 @@ begin
         select 1 from pg_proc
         join pg_namespace on pg_namespace.oid = pg_proc.pronamespace
         where pg_proc.proname = function_name
-        and pg_namespace.nspname like 'pg_temp%'
+        and pg_namespace.nspname = 'timeit_hash_functions'
     ) then
         execute format(
             $_$
-                CREATE OR REPLACE FUNCTION pg_temp."%1$s"(%2$s)
+                CREATE OR REPLACE FUNCTION timeit_hash_functions."%1$s"(%2$s)
                 RETURNS %3$s
                 LANGUAGE plpgsql
                 AS

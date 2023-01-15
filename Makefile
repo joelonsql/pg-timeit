@@ -19,6 +19,7 @@ SQL_SRC = \
 	TYPES/test_state.sql \
 	TABLES/tests.sql \
 	FUNCTIONS/round_to_sig_figs.sql \
+	SCHEMAS/timeit_hash_functions.sql \
 	FUNCTIONS/create_or_lookup_function.sql \
 	FUNCTIONS/measure.sql \
 	FUNCTIONS/now.sql \

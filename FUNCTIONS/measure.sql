@@ -39,7 +39,7 @@ begin
     INTO args
     FROM unnest(array_append(input_values,executions::text));
 
-    execute format('SELECT pg_temp."%s"(%s)', test_function, args)
+    execute format('SELECT timeit_hash_functions."%s"(%s)', test_function, args)
     into test_time;
 
     return test_time;

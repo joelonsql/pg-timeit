@@ -38,12 +38,12 @@ suitable when you simply want to do a single measurement.
 ```sql
 CREATE EXTENSION timemit;
 
-CREATE FUNCTION pg_temp.numeric_sqrt_volatile(numeric)
+CREATE FUNCTION numeric_sqrt_volatile(numeric)
     RETURNS numeric
     LANGUAGE internal
     AS 'numeric_sqrt';
 
-SELECT timeit.now('pg_temp.numeric_sqrt_volatile(2)');
+SELECT timeit.now('numeric_sqrt_volatile(2)');
     now
 -----------
  0.0000002
@@ -66,10 +66,6 @@ immediately.
 ```sql
 CREATE EXTENSION timemit;
 
---
--- Cannot use temp schema for wrapper functions since timeit.work()
--- will run the jobs in a different session, so use public
---
 CREATE FUNCTION numeric_sqrt_volatile(numeric)
     RETURNS numeric
     LANGUAGE internal
@@ -290,13 +286,13 @@ functions we want to measure.
 [volatile]: https://www.postgresql.org/docs/current/xfunc-volatility.html
 
 ```sql
-CREATE FUNCTION pg_temp.numeric_add_volatile(numeric,numeric)
+CREATE FUNCTION numeric_add_volatile(numeric,numeric)
 RETURNS numeric
 VOLATILE
 LANGUAGE internal
 AS 'numeric_add';
 
-SELECT pg_temp.numeric_add_volatile(1.5, 2.5);
+SELECT numeric_add_volatile(1.5, 2.5);
  numeric_add_volatile
 ----------------------
                   4.0
@@ -306,7 +302,7 @@ SELECT pg_temp.numeric_add_volatile(1.5, 2.5);
 We're now ready to measure it.
 
 ```sql
-SELECT timeit.now('pg_temp.numeric_add_volatile(1.5, 2.5)');
+SELECT timeit.now('numeric_add_volatile(1.5, 2.5)');
     now
 ------------
  0.00000003
@@ -316,7 +312,7 @@ SELECT timeit.now('pg_temp.numeric_add_volatile(1.5, 2.5)');
 Optionally, we can pass the argument separately:
 
 ```sql
-SELECT timeit.now('pg_temp.numeric_add_volatile($1, $2)', '{numeric,numeric}', '{1.5, 2.5}');
+SELECT timeit.now('numeric_add_volatile($1, $2)', '{numeric,numeric}', '{1.5, 2.5}');
     now
 ------------
  0.00000003
@@ -328,7 +324,7 @@ By default, a result with one significant figure is produced.
 If we instead want two significant figures:
 
 ```sql
-SELECT timeit.now('pg_temp.numeric_add_volatile(1.5, 2.5)', 2);
+SELECT timeit.now('numeric_add_volatile(1.5, 2.5)', 2);
      now
 -------------
  0.000000032
@@ -336,7 +332,7 @@ SELECT timeit.now('pg_temp.numeric_add_volatile(1.5, 2.5)', 2);
 ```
 
 ```sql
-SELECT timeit.now('pg_temp.numeric_add_volatile($1, $2)', '{numeric,numeric}', '{1.5, 2.5}', 2);
+SELECT timeit.now('numeric_add_volatile($1, $2)', '{numeric,numeric}', '{1.5, 2.5}', 2);
      now
 -------------
  0.000000032
@@ -416,7 +412,7 @@ takes about 3 seconds longer time, which nicely matches the `timeit.now()`
 returned result:
 
 ```sql
-SELECT count(pg_temp.numeric_add_volatile(1.5, 2.5)) FROM generate_series(1,1e8);
+SELECT count(numeric_add_volatile(1.5, 2.5)) FROM generate_series(1,1e8);
    count
 -----------
  100000000
