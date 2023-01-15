@@ -1,2 +1,2 @@
 #!/bin/sh
-while true ; do psql -c "CALL timeit.work()" ; sleep 1 ; done
+while true ; do psql -X -q -c "CALL timeit.work()" ; sleep 1 ; done
