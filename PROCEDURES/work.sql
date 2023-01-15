@@ -73,6 +73,8 @@ loop
 
     if test_state = 'init' then
 
+        RAISE NOTICE 'test id % initialized', id;
+
         base_overhead_time := timeit.measure(overhead_expression, input_types, input_values, 1);
         base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
         executions := greatest(
@@ -129,6 +131,8 @@ loop
                 final_result = fn.final_result,
                 last_run = clock_timestamp()
             WHERE tests.id = fn.id;
+
+            RAISE NOTICE 'test id % finalized', id;
 
         else
 
