@@ -71,88 +71,99 @@ in
     ORDER BY tests.last_run NULLS FIRST
 loop
 
-    if test_state = 'init' then
+    begin
 
-        RAISE NOTICE 'test id % initialized', id;
+        if test_state = 'init' then
 
-        base_overhead_time := timeit.measure(overhead_expression, input_types, input_values, 1);
-        base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
-        executions := greatest(
-            1,
-            (10 ^ significant_figures) * (base_overhead_time / base_test_time)
-        );
+            RAISE NOTICE 'test id % initialized', id;
 
-        UPDATE timeit.tests SET
-            test_state = 'run_test_1',
-            base_overhead_time = fn.base_overhead_time,
-            base_test_time = fn.base_test_time,
-            executions = fn.executions,
-            last_run = clock_timestamp()
-        WHERE tests.id = fn.id;
-
-    elsif test_state = 'run_test_1' then
-
-        test_time_1 := timeit.measure(test_expression, input_types, input_values, executions);
-        overhead_time_1 := timeit.measure(overhead_expression, input_types, input_values, executions);
-
-        UPDATE timeit.tests SET
-            test_state = 'run_test_2',
-            test_time_1 = fn.test_time_1,
-            overhead_time_1 = fn.overhead_time_1,
-            last_run = clock_timestamp()
-        WHERE tests.id = fn.id;
-
-    elsif test_state = 'run_test_2' then
-
-        test_time_2 := timeit.measure(test_expression, input_types, input_values, executions);
-        overhead_time_2 := timeit.measure(overhead_expression, input_types, input_values, executions);
-
-        net_time_1 := test_time_1 - overhead_time_1;
-        net_time_2 := test_time_2 - overhead_time_2;
-
-        if
-            least(net_time_1,net_time_2)
-            >
-            base_overhead_time * (10 ^ significant_figures)
-        and
-            timeit.round_to_sig_figs(net_time_1, significant_figures)
-            =
-            timeit.round_to_sig_figs(net_time_2, significant_figures)
-        then
-            final_result := timeit.round_to_sig_figs(
-                (net_time_1 + net_time_2) / (2 * executions)::numeric,
-                significant_figures
+            base_overhead_time := timeit.measure(overhead_expression, input_types, input_values, 1);
+            base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
+            executions := greatest(
+                1,
+                (10 ^ significant_figures) * (base_overhead_time / base_test_time)
             );
 
             UPDATE timeit.tests SET
-                test_state = 'final',
-                test_time_2 = fn.test_time_2,
-                overhead_time_2 = fn.overhead_time_2,
-                final_result = fn.final_result,
+                test_state = 'run_test_1',
+                base_overhead_time = fn.base_overhead_time,
+                base_test_time = fn.base_test_time,
+                executions = fn.executions,
                 last_run = clock_timestamp()
             WHERE tests.id = fn.id;
 
-            RAISE NOTICE 'test id % finalized', id;
+        elsif test_state = 'run_test_1' then
+
+            test_time_1 := timeit.measure(test_expression, input_types, input_values, executions);
+            overhead_time_1 := timeit.measure(overhead_expression, input_types, input_values, executions);
+
+            UPDATE timeit.tests SET
+                test_state = 'run_test_2',
+                test_time_1 = fn.test_time_1,
+                overhead_time_1 = fn.overhead_time_1,
+                last_run = clock_timestamp()
+            WHERE tests.id = fn.id;
+
+        elsif test_state = 'run_test_2' then
+
+            test_time_2 := timeit.measure(test_expression, input_types, input_values, executions);
+            overhead_time_2 := timeit.measure(overhead_expression, input_types, input_values, executions);
+
+            net_time_1 := test_time_1 - overhead_time_1;
+            net_time_2 := test_time_2 - overhead_time_2;
+
+            if
+                least(net_time_1,net_time_2)
+                >
+                base_overhead_time * (10 ^ significant_figures)
+            and
+                timeit.round_to_sig_figs(net_time_1, significant_figures)
+                =
+                timeit.round_to_sig_figs(net_time_2, significant_figures)
+            then
+                final_result := timeit.round_to_sig_figs(
+                    (net_time_1 + net_time_2) / (2 * executions)::numeric,
+                    significant_figures
+                );
+
+                UPDATE timeit.tests SET
+                    test_state = 'final',
+                    test_time_2 = fn.test_time_2,
+                    overhead_time_2 = fn.overhead_time_2,
+                    final_result = fn.final_result,
+                    last_run = clock_timestamp()
+                WHERE tests.id = fn.id;
+
+                RAISE NOTICE 'test id % finalized', id;
+
+            else
+
+                executions := executions * 2;
+
+                UPDATE timeit.tests SET
+                    test_state = 'run_test_1',
+                    executions = fn.executions,
+                    test_time_2 = fn.test_time_2,
+                    overhead_time_2 = fn.overhead_time_2,
+                    last_run = clock_timestamp()
+                WHERE tests.id = fn.id;
+
+            end if;
 
         else
 
-            executions := executions * 2;
-
-            UPDATE timeit.tests SET
-                test_state = 'run_test_1',
-                executions = fn.executions,
-                test_time_2 = fn.test_time_2,
-                overhead_time_2 = fn.overhead_time_2,
-                last_run = clock_timestamp()
-            WHERE tests.id = fn.id;
+            continue;
 
         end if;
 
-    else
+    exception when others then
 
-        continue;
+        UPDATE timeit.tests SET
+            test_state = 'final',
+            error = SQLERRM
+        WHERE tests.id = fn.id;
 
-    end if;
+    end;
 
     COMMIT;
 
