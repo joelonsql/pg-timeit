@@ -35,8 +35,12 @@ increased until the final result has the desired number of signifiant figures.
 `timeit.now()` immediately measures the execution time for an expression,
 suitable when you simply want to do a single measurement.
 
+The below example measures the execution time to compute the square root for
+the `numeric` value `2`. The `numeric_sqrt_volatile()` function is necessary
+to avoid caching since `sqrt` is an [immutable] function.
+
 ```sql
-CREATE EXTENSION timemit;
+CREATE EXTENSION timeit;
 
 CREATE FUNCTION numeric_sqrt_volatile(numeric)
     RETURNS numeric
@@ -64,35 +68,56 @@ values to be measured, without having to do the actual measurement
 immediately.
 
 ```sql
-CREATE EXTENSION timemit;
-
-CREATE FUNCTION numeric_sqrt_volatile(numeric)
-    RETURNS numeric
-    LANGUAGE internal
-    AS 'numeric_sqrt';
-
---
--- Spawn 131072 measurements of sqrt(2e0)...sqrt(2e131071)
---
-SELECT count(timeit.async('numeric_sqrt_volatile($1)',ARRAY['numeric'],ARRAY[format('2e%s',exp)]))
-FROM generate_series(0,131071) AS exp;
- count
---------
- 131072
-(1 row)
+CREATE TABLE my_sqrt_test AS
+SELECT
+    timeit.async(
+        'numeric_sqrt_volatile($1)',
+        ARRAY['numeric'],
+        ARRAY[format('2e%s',exp)],
+        3
+    ) AS id,
+    exp
+FROM generate_series(0,1000,2) AS exp;
 
 --
--- The pg-timeit-worker daemon will process the tests one by one.
+-- timeit.work() can be executed manually like in this example,
+-- or, run in the background by adding pg-timeit-worker.sh
+-- to e.g. launchd or systemd, see Installation section.
 --
--- Query to check the progress:
---
+CALL timeit.work(return_when_idle := true);
+NOTICE:  working
+NOTICE:  idle
 
-SELECT test_state, count(*) FROM timeit.tests GROUP BY 1 ORDER BY 1;
- test_state | count
-------------+--------
- init       | 115553
- run_test_1 |  15519
-(2 rows)
+SELECT
+    format('sqrt(2e%s)',exp) AS test_expression,
+    trim_scale(tests.final_result*1e9) AS time_ns
+FROM my_sqrt_test
+JOIN timeit.tests ON tests.id = my_sqrt_test.id
+ORDER BY exp
+LIMIT 3;
+
+ test_expression | time_ns
+-----------------+---------
+ sqrt(2e0)       |    97.1
+ sqrt(2e2)       |    97.5
+ sqrt(2e4)       |    99.8
+(3 rows)
+
+SELECT
+    format('sqrt(2e%s)',exp) AS test_expression,
+    trim_scale(tests.final_result*1e9) AS time_ns
+FROM my_sqrt_test
+JOIN timeit.tests ON tests.id = my_sqrt_test.id
+ORDER BY exp DESC
+LIMIT 3;
+
+ test_expression | time_ns
+-----------------+---------
+ sqrt(2e1000)    |    7770
+ sqrt(2e998)     |    7580
+ sqrt(2e996)     |    7640
+(3 rows)
+
 ```
 
 
