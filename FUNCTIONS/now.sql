@@ -51,7 +51,7 @@ begin
     -- instead of starting at 1.
     --
 
-    base_overhead_time := timeit.measure('1', input_types, input_values, 1);
+    base_overhead_time := timeit.measure(overhead_expression, input_types, input_values, 1);
     base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
 
     executions := greatest(
@@ -62,10 +62,10 @@ begin
     loop
 
         test_time_1 := timeit.measure(test_expression, input_types, input_values, executions);
-        overhead_time_1 := timeit.measure('1', input_types, input_values, executions);
+        overhead_time_1 := timeit.measure(overhead_expression, input_types, input_values, executions);
 
         test_time_2 := timeit.measure(test_expression, input_types, input_values, executions);
-        overhead_time_2 := timeit.measure('1', input_types, input_values, executions);
+        overhead_time_2 := timeit.measure(overhead_expression, input_types, input_values, executions);
 
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
