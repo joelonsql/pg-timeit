@@ -57,3 +57,13 @@ begin
 
 end
 $$;
+
+CREATE OR REPLACE FUNCTION timeit.async(
+    test_expression text,
+    significant_figures integer
+)
+RETURNS numeric
+LANGUAGE sql
+AS $$
+SELECT timeit.async($1,ARRAY[]::text[],ARRAY[]::text[],$2);
+$$;
