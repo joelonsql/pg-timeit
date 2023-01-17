@@ -13,8 +13,6 @@ SELECT timeit.async('pg_sleep(0.1)');
 --
 CALL timeit.work(return_when_idle := true);
 NOTICE:  working
-NOTICE:  test id 1 initialized
-NOTICE:  test id 1 finalized
 NOTICE:  idle
 --
 -- Have a look at test results.
