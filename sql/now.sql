@@ -2,12 +2,22 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS timeit;
 
-SELECT timeit.now('pg_sleep(0.05)');
+SELECT timeit.now('pg_sleep(0.1)');
 
+--
+-- Request two significant figures in result.
+--
 SELECT timeit.now('pg_sleep(0.1)', 2);
 
-SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.13}');
+--
+-- Pass argument types/values separately.
+--
+SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.1}');
 
-SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.13}', 2);
+--
+-- Pass argument types/values separately,
+-- and request two significant figures in result.
+--
+SELECT timeit.now('pg_sleep($1)', '{numeric}', '{0.1}', 2);
 
 ROLLBACK;
