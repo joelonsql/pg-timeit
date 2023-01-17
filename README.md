@@ -67,7 +67,8 @@ immediately.
 ```sql
 CREATE FUNCTION numeric_sqrt_volatile(numeric) RETURNS numeric LANGUAGE internal AS 'numeric_sqrt';
 
-SELECT timeit.async(format('numeric_sqrt_volatile(2e%s)',unnest)) FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
+SELECT timeit.async(format('numeric_sqrt_volatile(2e%s)',unnest))
+FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
 
  async
 -------
