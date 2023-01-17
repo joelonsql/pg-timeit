@@ -42,10 +42,7 @@ to avoid caching since `sqrt` is an [immutable] function.
 ```sql
 CREATE EXTENSION timeit;
 
-CREATE FUNCTION numeric_sqrt_volatile(numeric)
-    RETURNS numeric
-    LANGUAGE internal
-    AS 'numeric_sqrt';
+CREATE FUNCTION numeric_sqrt_volatile(numeric) RETURNS numeric LANGUAGE internal AS 'numeric_sqrt';
 
 SELECT timeit.now('numeric_sqrt_volatile(2)');
     now
@@ -68,16 +65,20 @@ values to be measured, without having to do the actual measurement
 immediately.
 
 ```sql
-CREATE TABLE my_sqrt_test AS
-SELECT
-    timeit.async(
-        'numeric_sqrt_volatile($1)',
-        ARRAY['numeric'],
-        ARRAY[format('2e%s',exp)],
-        3
-    ) AS id,
-    exp
-FROM generate_series(0,1000,2) AS exp;
+CREATE FUNCTION numeric_sqrt_volatile(numeric) RETURNS numeric LANGUAGE internal AS 'numeric_sqrt';
+
+SELECT timeit.async(format('numeric_sqrt_volatile(2e%s)',unnest)) FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
+
+ async
+-------
+     1
+     2
+     3
+     4
+     5
+     6
+     7
+(7 rows)
 
 --
 -- timeit.work() can be executed manually like in this example,
@@ -88,38 +89,20 @@ CALL timeit.work(return_when_idle := true);
 NOTICE:  working
 NOTICE:  idle
 
-SELECT
-    format('sqrt(2e%s)',exp) AS test_expression,
-    trim_scale(tests.final_result*1e9) AS time_ns
-FROM my_sqrt_test
-JOIN timeit.tests ON tests.id = my_sqrt_test.id
-ORDER BY exp
-LIMIT 3;
+SELECT id, test_expression, executions, final_result FROM timeit.tests ORDER BY id;
 
- test_expression | time_ns
------------------+---------
- sqrt(2e0)       |    97.1
- sqrt(2e2)       |    97.5
- sqrt(2e4)       |    99.8
-(3 rows)
-
-SELECT
-    format('sqrt(2e%s)',exp) AS test_expression,
-    trim_scale(tests.final_result*1e9) AS time_ns
-FROM my_sqrt_test
-JOIN timeit.tests ON tests.id = my_sqrt_test.id
-ORDER BY exp DESC
-LIMIT 3;
-
- test_expression | time_ns
------------------+---------
- sqrt(2e1000)    |    7770
- sqrt(2e998)     |    7580
- sqrt(2e996)     |    7640
-(3 rows)
+ id |         test_expression         | executions | final_result
+----+---------------------------------+------------+--------------
+  1 | numeric_sqrt_volatile(2e0)      |      24576 |   0.00000008
+  2 | numeric_sqrt_volatile(2e10)     |       3072 |   0.00000009
+  3 | numeric_sqrt_volatile(2e100)    |        512 |    0.0000007
+  4 | numeric_sqrt_volatile(2e1000)   |         32 |     0.000008
+  5 | numeric_sqrt_volatile(2e10000)  |          1 |       0.0002
+  6 | numeric_sqrt_volatile(2e100000) |          1 |         0.02
+  7 | numeric_sqrt_volatile(2e131071) |          1 |         0.03
+(7 rows)
 
 ```
-
 
 Another nice thing with `timeit.async()` and `timeit.work()` is that they
 spread out the actual measurements over time, by first doing one measurement,
