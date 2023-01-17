@@ -1,48 +1,24 @@
 CREATE EXTENSION timeit;
+--
+-- Enqueue new test.
+--
 SELECT timeit.async('pg_sleep(0.1)');
  async 
 -------
      1
 (1 row)
 
-SELECT
-    id,
-    test_state,
-    executions,
-    final_result
-FROM timeit.tests;
- id | test_state | executions | final_result 
-----+------------+------------+--------------
-  1 | init       |            |             
-(1 row)
-
-CALL timeit.work();
+--
+-- Work until there is no more work.
+--
+CALL timeit.work(return_when_idle := true);
+NOTICE:  working
 NOTICE:  test id 1 initialized
-SELECT
-    id,
-    test_state,
-    executions,
-    final_result
-FROM timeit.tests;
- id | test_state | executions | final_result 
-----+------------+------------+--------------
-  1 | run_test_1 |          1 |             
-(1 row)
-
-CALL timeit.work();
-SELECT
-    id,
-    test_state,
-    executions,
-    final_result
-FROM timeit.tests;
- id | test_state | executions | final_result 
-----+------------+------------+--------------
-  1 | run_test_2 |          1 |             
-(1 row)
-
-CALL timeit.work();
 NOTICE:  test id 1 finalized
+NOTICE:  idle
+--
+-- Have a look at test results.
+--
 SELECT
     id,
     test_state,
