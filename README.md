@@ -14,6 +14,7 @@
     1. [timeit.round_to_sig_figs()]
     2. [timeit.create_or_lookup_function()]
     3. [timeit.measure()]
+    4. [timeit.eval()]
 8. [Examples](#examples)
 
 [timeit.now()]: #timeit-now
@@ -22,6 +23,7 @@
 [timeit.round_to_sig_figs()]: #timeit-round-to-sig-figs
 [timeit.create_or_lookup_function()]: #timeit-create-or-lookup-function
 [timeit.measure()]: #timeit-measure
+[timeit.eval()]: #timeit-eval
 [timeit.work()]: #timeit-work
 
 <h2 id="about">1. About</h2>
@@ -88,19 +90,47 @@ FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
 --
 CALL timeit.work(return_when_idle := true);
 NOTICE:  working
+NOTICE:  7 in queue
+NOTICE:  7 in queue
+NOTICE:  7 in queue
+NOTICE:  5 in queue
+NOTICE:  5 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  4 in queue
+NOTICE:  3 in queue
+NOTICE:  3 in queue
+NOTICE:  3 in queue
+NOTICE:  3 in queue
+NOTICE:  2 in queue
+NOTICE:  2 in queue
+NOTICE:  1 in queue
+NOTICE:  1 in queue
 NOTICE:  idle
 
-SELECT id, test_expression, executions, final_result FROM timeit.tests ORDER BY id;
+SELECT
+    tests.id,
+    test_params.test_expression,
+    tests.executions,
+    tests.final_result
+FROM timeit.tests
+JOIN timeit.test_params USING (id)
+ORDER BY id;
 
  id |         test_expression         | executions | final_result
 ----+---------------------------------+------------+--------------
-  1 | numeric_sqrt_volatile(2e0)      |      24576 |   0.00000008
-  2 | numeric_sqrt_volatile(2e10)     |       3072 |   0.00000009
-  3 | numeric_sqrt_volatile(2e100)    |        512 |    0.0000007
-  4 | numeric_sqrt_volatile(2e1000)   |         32 |     0.000008
-  5 | numeric_sqrt_volatile(2e10000)  |          1 |       0.0002
-  6 | numeric_sqrt_volatile(2e100000) |          1 |         0.02
-  7 | numeric_sqrt_volatile(2e131071) |          1 |         0.03
+  1 | numeric_sqrt_volatile(2e0)      |       1024 |    0.0000001
+  2 | numeric_sqrt_volatile(2e10)     |        512 |    0.0000001
+  3 | numeric_sqrt_volatile(2e100)    |        128 |    0.0000008
+  4 | numeric_sqrt_volatile(2e1000)   |         32 |      0.00001
+  5 | numeric_sqrt_volatile(2e10000)  |          1 |       0.0006
+  6 | numeric_sqrt_volatile(2e100000) |          2 |         0.05
+  7 | numeric_sqrt_volatile(2e131071) |          1 |         0.09
 (7 rows)
 
 ```
@@ -258,6 +288,14 @@ tests, which reduces the bloat caused by the temp functions.
 Performs `executions` number of executions of `test_expression` with arguments passed via `input_types` and `input_values`.
 
 `input_types` and `input_values` can be empty arrays if the arguments are already contained in the `test_expression`.
+
+<h3 id="timeit-eval"><code>timeit.eval(test_expression text, input_types text[], input_values text[]) -> text</code></h3>
+
+Performs a single execution of `test_expression` with arguments passed via `input_types` and `input_values`.
+
+`input_types` and `input_values` can be empty arrays if the arguments are already contained in the `test_expression`.
+
+Returns the result casted to text.
 
 <h2 id="api">8. Examples</h2>
 
