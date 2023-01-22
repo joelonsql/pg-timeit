@@ -9,7 +9,6 @@ LANGUAGE plpgsql
 AS $$
 <<fn>>
 declare
-    test_hash bytea;
     id bigint;
 begin
 
@@ -23,35 +22,16 @@ begin
         raise exception 'different number of input types and input values';
     end if;
 
-    test_hash := sha256(
-        convert_to(
-            format(
-                '%L%L%L%L',
-                test_expression,
-                input_types::text,
-                input_values::text,
-                significant_figures
-            ),
-            'utf8'
-        )
-    );
-
-    SELECT
-        tests.id
-    INTO
-        id
-    FROM timeit.tests
-    WHERE tests.test_hash = fn.test_hash;
-
-    if found then
-        return id;
-    end if;
-
     INSERT INTO timeit.tests
-        (test_hash, test_expression, input_types, input_values, significant_figures)
+        (test_state)
     VALUES
-        (test_hash, test_expression, input_types, input_values, significant_figures)
+        ('init')
     RETURNING tests.id INTO id;
+
+    INSERT INTO timeit.test_params
+        (id, test_expression, input_types, input_values, significant_figures)
+    VALUES
+        (id, test_expression, input_types, input_values, significant_figures);
 
     return id;
 

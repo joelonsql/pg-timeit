@@ -24,18 +24,23 @@ declare
     last_run timestamptz;
     overhead_expression text;
     idle boolean := true;
+    queue_count bigint;
+    return_value text;
 begin
 
 loop
 
-    if exists (
-        SELECT 1 FROM timeit.tests
-        WHERE tests.test_state <> 'final'
-    ) then
+    SELECT count(*)
+    INTO queue_count
+    FROM timeit.tests
+    WHERE tests.test_state <> 'final';
+
+    if queue_count <> 0 then
         if idle then
             raise notice 'working';
             idle := false;
         end if;
+        raise notice '% in queue', queue_count;
     else
         if not idle then
             raise notice 'idle';
@@ -78,10 +83,10 @@ loop
         SELECT
             tests.id,
             tests.test_state,
-            tests.test_expression,
-            tests.input_types,
-            tests.input_values,
-            tests.significant_figures,
+            test_params.test_expression,
+            test_params.input_types,
+            test_params.input_values,
+            test_params.significant_figures,
             tests.base_overhead_time,
             tests.base_test_time,
             tests.executions,
@@ -90,8 +95,9 @@ loop
             tests.test_time_2,
             tests.overhead_time_2
         FROM timeit.tests
+        JOIN timeit.test_params ON test_params.id = tests.id
         WHERE tests.test_state <> 'final'
-        ORDER BY tests.last_run NULLS FIRST
+        ORDER BY random()
     loop
 
         begin
@@ -112,6 +118,12 @@ loop
                     executions = fn.executions,
                     last_run = clock_timestamp()
                 WHERE tests.id = fn.id;
+
+                return_value := timeit.eval(test_expression, input_types, input_values);
+
+                UPDATE timeit.test_params SET
+                    return_value = fn.return_value
+                WHERE test_params.id = fn.id;
 
             elsif test_state = 'run_test_1' then
 
