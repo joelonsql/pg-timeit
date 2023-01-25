@@ -1,5 +1,6 @@
 comment = 'measure runtime of expressions'
 default_version = '1.0'
+module_pathname = '$libdir/timeit'
 relocatable = false
 schema = timeit
 superuser = false

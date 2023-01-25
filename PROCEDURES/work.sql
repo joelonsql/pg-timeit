@@ -7,19 +7,16 @@ declare
     id bigint;
     test_state timeit.test_state;
     test_expression text;
-    input_types text[];
     input_values text[];
     significant_figures integer;
 -- state data:
-    base_overhead_time numeric;
-    base_test_time numeric;
     executions bigint;
-    test_time_1 numeric;
-    overhead_time_1 numeric;
-    test_time_2 numeric;
-    overhead_time_2 numeric;
-    net_time_1 numeric;
-    net_time_2 numeric;
+    test_time_1 bigint;
+    overhead_time_1 bigint;
+    test_time_2 bigint;
+    overhead_time_2 bigint;
+    net_time_1 bigint;
+    net_time_2 bigint;
     final_result numeric;
     last_run timestamptz;
     overhead_expression text;
@@ -69,11 +66,8 @@ loop
         id,
         test_state,
         test_expression,
-        input_types,
         input_values,
         significant_figures,
-        base_overhead_time,
-        base_test_time,
         executions,
         test_time_1,
         overhead_time_1,
@@ -84,11 +78,8 @@ loop
             tests.id,
             tests.test_state,
             test_params.test_expression,
-            test_params.input_types,
             test_params.input_values,
             test_params.significant_figures,
-            tests.base_overhead_time,
-            tests.base_test_time,
             tests.executions,
             tests.test_time_1,
             tests.overhead_time_1,
@@ -104,22 +95,16 @@ loop
 
             if test_state = 'init' then
 
-                base_overhead_time := timeit.measure(overhead_expression, input_types, input_values, 1);
-                base_test_time := timeit.measure(test_expression, input_types, input_values, 1);
-                executions := greatest(
-                    1,
-                    (10 ^ significant_figures) * (base_overhead_time / base_test_time)
-                );
+                executions := 1;
 
                 UPDATE timeit.tests SET
                     test_state = 'run_test_1',
-                    base_overhead_time = fn.base_overhead_time,
-                    base_test_time = fn.base_test_time,
                     executions = fn.executions,
                     last_run = clock_timestamp()
                 WHERE tests.id = fn.id;
 
-                return_value := timeit.eval(test_expression, input_types, input_values);
+-- TODO: Implement timeit.eval() in C that returns result in text.
+--                return_value := timeit.eval(test_expression, input_types, input_values);
 
                 UPDATE timeit.test_params SET
                     return_value = fn.return_value
@@ -127,8 +112,8 @@ loop
 
             elsif test_state = 'run_test_1' then
 
-                test_time_1 := timeit.measure(test_expression, input_types, input_values, executions);
-                overhead_time_1 := timeit.measure(overhead_expression, input_types, input_values, executions);
+                test_time_1 := timeit.measure(test_expression, input_values, executions);
+                overhead_time_1 := timeit.overhead(executions);
 
                 UPDATE timeit.tests SET
                     test_state = 'run_test_2',
@@ -139,8 +124,8 @@ loop
 
             elsif test_state = 'run_test_2' then
 
-                test_time_2 := timeit.measure(test_expression, input_types, input_values, executions);
-                overhead_time_2 := timeit.measure(overhead_expression, input_types, input_values, executions);
+                test_time_2 := timeit.measure(test_expression, input_values, executions);
+                overhead_time_2 := timeit.overhead(executions);
 
                 net_time_1 := test_time_1 - overhead_time_1;
                 net_time_2 := test_time_2 - overhead_time_2;
@@ -148,7 +133,7 @@ loop
                 if
                     least(net_time_1,net_time_2)
                     >
-                    base_overhead_time * (10 ^ significant_figures)
+                    (10 ^ significant_figures)
                 and
                     timeit.round_to_sig_figs(net_time_1, significant_figures)
                     =
@@ -156,7 +141,7 @@ loop
                 then
 
                     final_result := timeit.round_to_sig_figs(
-                        (net_time_1 + net_time_2) / (2 * executions)::numeric,
+                        (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                         significant_figures
                     );
 

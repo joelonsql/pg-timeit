@@ -1,4 +1,5 @@
 EXTENSION = timeit
+MODULES = measure overhead
 DATA = \
 	timeit--1.0.sql
 
@@ -23,6 +24,7 @@ SQL_SRC = \
 	SCHEMAS/timeit_hash_functions.sql \
 	FUNCTIONS/create_or_lookup_function.sql \
 	FUNCTIONS/measure.sql \
+	FUNCTIONS/overhead.sql \
 	FUNCTIONS/eval.sql \
 	FUNCTIONS/now.sql \
 	FUNCTIONS/async.sql \
