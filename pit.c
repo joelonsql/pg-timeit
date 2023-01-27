@@ -141,7 +141,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
     start_time = GetCurrentTimestamp();
 
     /* Execute internal function number_of_executions times. */
-    for (int64 i = 0; i < number_of_executions; i++)
+    for (volatile int64 i = 0; i < number_of_executions; i++)
     {
 		result = FunctionCallInvoke(testfunc_fcinfo);
     }
