@@ -50,7 +50,7 @@ respectively, as numeric values. These are suitable when you simply want
 to do a single measurement.
 
 The below example measures the execution time to compute the square root for
-the `numeric` value `2`.
+the `numeric` value `2`, and returns the result in nanoseconds.
 
 ```sql
 CREATE EXTENSION pit;

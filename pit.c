@@ -15,7 +15,7 @@ PG_MODULE_MAGIC;
  * When called by pit.eval(), only the first two arguments are specified.
  * It will then execute the specified internal function once with the
  * input values, and return the result as a text Datum.
- * 
+ *
  * When called by pit.measure(), all three argumnents are specified.
  * It will then execute the specified internal function as many times as
  * specified, and return the measured time in microseconds as a int64 Datum.
@@ -68,7 +68,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
 
     /* Lookup internal function by name. */
     proc_tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(proc_oid));
-    if (!HeapTupleIsValid(proc_tuple)) 
+    if (!HeapTupleIsValid(proc_tuple))
     {
         elog(ERROR, "Function %s not found", internal_function_name_c_string);
     }
@@ -180,7 +180,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
         /* Return total execution time in microseconds. */
         PG_RETURN_INT64(total_time);
     }
-  
+
 }
 
 /*
