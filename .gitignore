@@ -4,3 +4,5 @@ regression.out
 results
 pit--*.sql
 pit-worker.log
+pit.o
+pit.dylib
