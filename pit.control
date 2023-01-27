@@ -1,0 +1,6 @@
+comment = 'measure runtime of built-in functions'
+default_version = '1.0'
+module_pathname = '$libdir/pit'
+relocatable = false
+schema = pit
+superuser = false

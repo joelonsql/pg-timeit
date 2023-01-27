@@ -1,6 +1,6 @@
-CREATE OR REPLACE FUNCTION timeit.overhead(
+CREATE OR REPLACE FUNCTION pit.overhead(
     executions bigint
 )
 RETURNS bigint
 LANGUAGE c
-AS '$libdir/overhead';
+AS '$libdir/pit', 'overhead';

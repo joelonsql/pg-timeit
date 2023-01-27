@@ -1,5 +1,8 @@
-CREATE OR REPLACE FUNCTION timeit.now(
-    test_expression text,
+--
+-- Returns measured execution_time in seconds.
+--
+CREATE OR REPLACE FUNCTION pit.s(
+    function_name text,
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1
 )
@@ -19,7 +22,7 @@ declare
     overhead_expression text;
 begin
 
-    if num_nulls(test_expression,input_values,significant_figures) <> 0
+    if num_nulls(function_name,input_values,significant_figures) <> 0
     then
         raise exception 'no arguments must be null';
     end if;
@@ -28,11 +31,11 @@ begin
 
     loop
 
-        test_time_1 := timeit.measure(test_expression, input_values, executions);
-        overhead_time_1 := timeit.overhead(executions);
+        test_time_1 := pit.measure(function_name, input_values, executions);
+        overhead_time_1 := pit.overhead(executions);
 
-        test_time_2 := timeit.measure(test_expression, input_values, executions);
-        overhead_time_2 := timeit.overhead(executions);
+        test_time_2 := pit.measure(function_name, input_values, executions);
+        overhead_time_2 := pit.overhead(executions);
 
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
@@ -43,11 +46,11 @@ begin
             (10 ^ significant_figures)
         then
 
-            if timeit.round_to_sig_figs(net_time_1, significant_figures)
-             = timeit.round_to_sig_figs(net_time_2, significant_figures)
+            if pit.round_to_sig_figs(net_time_1, significant_figures)
+             = pit.round_to_sig_figs(net_time_2, significant_figures)
             then
 
-                final_result := timeit.round_to_sig_figs(
+                final_result := pit.round_to_sig_figs(
                     (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                     significant_figures
                 );
@@ -63,14 +66,4 @@ begin
     end loop;
 
 end
-$$;
-
-CREATE OR REPLACE FUNCTION timeit.now(
-    test_expression text,
-    significant_figures integer
-)
-RETURNS numeric
-LANGUAGE sql
-AS $$
-SELECT timeit.now($1,ARRAY[]::text[],ARRAY[]::text[],$2);
 $$;

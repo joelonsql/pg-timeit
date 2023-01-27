@@ -1,8 +1,8 @@
-CREATE OR REPLACE FUNCTION timeit.measure(
+CREATE OR REPLACE FUNCTION pit.measure(
     internal_function text,
     input_values text[],
     executions bigint
 )
 RETURNS bigint
 LANGUAGE c
-AS '$libdir/measure';
+AS '$libdir/pit', 'measure_or_eval';
