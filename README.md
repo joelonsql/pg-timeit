@@ -55,6 +55,24 @@ the `numeric` value `2`, and returns the result in nanoseconds.
 ```sql
 CREATE EXTENSION pit;
 
+SELECT pit.ns('now');
+ ns
+-----
+ 0.5
+(1 row)
+
+SELECT pit.ns('drandom');
+ ns
+----
+  4
+(1 row)
+
+SELECT pit.ns('clock_timestamp');
+ ns
+----
+ 30
+(1 row)
+
 SELECT pit.ns('numeric_sqrt','{2}');
  ns
 -----
