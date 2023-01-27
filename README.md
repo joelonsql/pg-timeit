@@ -78,6 +78,19 @@ SELECT pit.ns('numeric_sqrt','{2}');
 -----
  200
 (1 row)
+
+SELECT pit.ns('numeric_sqrt','{2e131071}');
+    ns
+----------
+ 30000000
+(1 row)
+
+SELECT pit.s('numeric_sqrt','{2e131071}');
+  s
+------
+ 0.03
+(1 row)
+
 ```
 
 Another simple example where we measure `pg_sleep(1)` with three
