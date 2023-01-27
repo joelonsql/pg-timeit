@@ -34,9 +34,9 @@
 
 <h2 id="about">1. About</h2>
 
-`pit` is a [PostgreSQL] extension to measure the execution time of
-built-in internal C-functions with **nanosecond resolution**. The high accurancy
-is achived by also adjusting for the overhead of the measurement itself.
+`pit` (short for **p**g-time**it**) is a [PostgreSQL] extension to measure
+the execution time of built-in internal C-functions with **nanosecond resolution**.
+The high accurancy is achived by also adjusting for the overhead of the measurement itself.
 The number of necessary test iterations/executions are auto-detected and
 increased until the final result has the desired number of signifiant figures.
 
