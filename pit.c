@@ -32,11 +32,11 @@ measure_or_eval(PG_FUNCTION_ARGS)
 
     char                *internal_function_name_c_string;
     Datum               *values;
-	Datum               *dvalues;
-	bool                *nulls;
-	int                 nelems;
+    Datum               *dvalues;
+    bool                *nulls;
+    int                 nelems;
     Oid                 proc_oid;
-	Oid                 proc_typoutput;
+    Oid                 proc_typoutput;
     HeapTuple           proc_tuple;
     Form_pg_proc        proc_form;
     TimestampTz         start_time;
@@ -60,11 +60,11 @@ measure_or_eval(PG_FUNCTION_ARGS)
     proc_oid = fmgr_internal_function(internal_function_name_c_string);
 
     /* Check that the function exists. */
-	if (proc_oid == InvalidOid)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("there is no built-in function named \"%s\"",
-						internal_function_name_c_string)));
+    if (proc_oid == InvalidOid)
+        ereport(ERROR,
+                (errcode(ERRCODE_UNDEFINED_FUNCTION),
+                 errmsg("there is no built-in function named \"%s\"",
+                        internal_function_name_c_string)));
 
     /* Lookup internal function by name. */
     proc_tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(proc_oid));
@@ -86,17 +86,17 @@ measure_or_eval(PG_FUNCTION_ARGS)
     }
 
     /* Convert arguments from text. */
-	dvalues = (Datum *) palloc(nelems * sizeof(Datum));
+    dvalues = (Datum *) palloc(nelems * sizeof(Datum));
     anynull = false;
     for (int i = 0; i < nelems; i++)
     {
-		Oid			typoid,
+        Oid			typoid,
                     typinput,
-					typioparam;
-		FmgrInfo   *typfunc_finfo;
+                    typioparam;
+        FmgrInfo   *typfunc_finfo;
 
         typoid = proc_form->proargtypes.values[i];
-		typfunc_finfo = palloc0(sizeof(FmgrInfo));
+        typfunc_finfo = palloc0(sizeof(FmgrInfo));
         getTypeInputInfo(typoid, &typinput, &typioparam);
         fmgr_info_cxt(typinput, typfunc_finfo, fcinfo->flinfo->fn_mcxt);
         if (nulls[i])
@@ -143,11 +143,8 @@ measure_or_eval(PG_FUNCTION_ARGS)
     /* Execute internal function number_of_executions times. */
     for (volatile int64 i = 0; i < number_of_executions; i++)
     {
-		result = FunctionCallInvoke(testfunc_fcinfo);
+        result = FunctionCallInvoke(testfunc_fcinfo);
     }
-
-	if (testfunc_fcinfo->isnull)
-		elog(ERROR, "function returned NULL");
 
     /* End measuring execution time. */
     end_time = GetCurrentTimestamp();
@@ -155,12 +152,15 @@ measure_or_eval(PG_FUNCTION_ARGS)
     /* Calculate total execution time. */
     total_time = end_time - start_time;
 
+    if (testfunc_fcinfo->isnull)
+        elog(ERROR, "function returned NULL");
+
     pfree(testfunc_finfo);
     pfree(testfunc_fcinfo);
 
-	ReleaseSysCache(proc_tuple);
-	pfree(values);
-	pfree(dvalues);
+    ReleaseSysCache(proc_tuple);
+    pfree(values);
+    pfree(dvalues);
 
     /*
      * Detect mode of operation.
@@ -173,7 +173,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
         /* Convert result to text and return. */
         getTypeOutputInfo(proc_form->prorettype, &proc_typoutput, &is_var_lena);
         result_c_string = OidOutputFunctionCall(proc_typoutput, result);
-	    PG_RETURN_TEXT_P(cstring_to_text(result_c_string));
+        PG_RETURN_TEXT_P(cstring_to_text(result_c_string));
     }
     else
     {
