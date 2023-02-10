@@ -6,31 +6,19 @@ SELECT pit.s('pg_sleep', ARRAY['0.1']);
  0.1
 (1 row)
 
-SELECT pit.ms('pg_sleep', ARRAY['0.1']);
- ms  
------
- 100
-(1 row)
-
-SELECT pit.us('pg_sleep', ARRAY['0.1']);
-   us   
+SELECT pit.h('pg_sleep', ARRAY['0.1']);
+   h    
 --------
- 100000
-(1 row)
-
-SELECT pit.ns('pg_sleep', ARRAY['0.1']);
-    ns     
------------
- 100000000
+ 100 ms
 (1 row)
 
 --
 -- Request two significant figures in result.
 --
-SELECT pit.ms('pg_sleep', ARRAY['0.1'], 2);
- ms  
------
- 100
+SELECT pit.h('pg_sleep', ARRAY['0.1'], 2);
+   h    
+--------
+ 100 ms
 (1 row)
 
 ROLLBACK;

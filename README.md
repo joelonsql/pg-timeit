@@ -6,24 +6,20 @@
 4. [Usage](#usage)
 5. [API](#api)
     1. [pit.s()]
-    2. [pit.ms()]
-    3. [pit.us()]
-    4. [pit.ns()]
-    5. [pit.async()]
-    6. [pit.work()]
+    2. [pit.h()]
+    3. [pit.async()]
+    4. [pit.work()]
 6. [Internal types](#internal-types)
     1. [test_state]
 7. [Internal functions](#internal-functions)
     1. [pit.round_to_sig_figs()]
     2. [pit.measure()]
     3. [pit.overhead()]
-    3. [pit.eval()]
+    4. [pit.eval()]
 8. [Examples](#examples)
 
 [pit.s()]: #pit-s
-[pit.ms()]: #pit-ms
-[pit.us()]: #pit-us
-[pit.ns()]: #pit-ns
+[pit.h()]: #pit-h
 [pit.async()]: #pit-async
 [pit.work()]: #pit-work
 [test_state]: #test-state
@@ -43,11 +39,13 @@ increased until the final result has the desired number of signifiant figures.
 To minimize noise, the executions and measurements are performed in C,
 as measuring using PL/pgSQL would be too noisy.
 
-`pit.s()`, `pit.ms()`, `pit.us()` and `pit.ns()` immediately
-measures the execution time for given internal function,
-and return the time in seconds, milliseconds, microseconds and nanoseconds
-respectively, as numeric values. These are suitable when you simply want
-to do a single measurement.
+`pit.s()` and `pit.h()` immediately measures the execution time for given
+internal function. These are suitable when you simply want to do a
+single measurement.
+
+`pit.s()` returns the execution time in seconds as a numeric value.
+`pit.h()` returns the execution time as a human-readable text value,
+e.g. "100 ms".
 
 The below example measures the execution time to compute the square root for
 the `numeric` value `2`, and returns the result in nanoseconds.
@@ -55,34 +53,22 @@ the `numeric` value `2`, and returns the result in nanoseconds.
 ```sql
 CREATE EXTENSION pit;
 
-SELECT pit.ns('now');
- ns
------
- 0.5
+SELECT pit.h('clock_timestamp');
+   h
+-------
+ 30 ns
 (1 row)
 
-SELECT pit.ns('drandom');
- ns
-----
-  4
+SELECT pit.h('numeric_sqrt','{2}');
+   h
+--------
+ 300 ns
 (1 row)
 
-SELECT pit.ns('clock_timestamp');
- ns
-----
- 30
-(1 row)
-
-SELECT pit.ns('numeric_sqrt','{2}');
- ns
------
- 200
-(1 row)
-
-SELECT pit.ns('numeric_sqrt','{2e131071}');
-    ns
-----------
- 30000000
+SELECT pit.h('numeric_sqrt','{2e131071}');
+   h
+-------
+ 30 ms
 (1 row)
 
 SELECT pit.s('numeric_sqrt','{2e131071}');
@@ -99,10 +85,10 @@ Another simple example where we measure `pg_sleep(1)` with three
 ```sql
 CREATE EXTENSION pit;
 
-SELECT pit.s('pg_sleep','{1}', 3);
-  s
-------
- 1.00
+SELECT pit.h('pg_sleep','{1}', 3);
+   h
+--------
+ 1.00 s
 (1 row)
 ```
 
@@ -249,17 +235,9 @@ Optionally, arguments can be passed by specifying `input_values`.
 
 The desired precision of the returned final result can be specified via `significant_figures`, which defaults to 1.
 
-<h3 id="pit-ms"><code>pit.ms(function_name [, input_values ] [, significant_figures]) → numeric</code></h3>
+<h3 id="pit-h"><code>pit.h(function_name [, input_values ] [, significant_figures]) → text</code></h3>
 
-Like `pit.s()`, but returns milliseconds instead.
-
-<h3 id="pit-us"><code>pit.ms(function_name [, input_values ] [, significant_figures]) → numeric</code></h3>
-
-Like `pit.s()`, but returns microseconds instead.
-
-<h3 id="pit-ns"><code>pit.ns(function_name [, input_values ] [, significant_figures]) → numeric</code></h3>
-
-Like `pit.s()`, but returns nanoseconds instead.
+Like `pit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
 
 <h3 id="pit-async"><code>pit.async(function_name [, input_values ] [, significant_figures]) → bigint</code></h3>
 
