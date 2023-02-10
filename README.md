@@ -334,10 +334,10 @@ SELECT numeric_add(1.5, 2.5);
 To measure it:
 
 ```sql
-SELECT pit.ns('numeric_add', ARRAY['1.5','2.5']);
- ns
-----
- 20
+SELECT pit.h('numeric_add', ARRAY['1.5','2.5']);
+   h
+-------
+ 60 ns
 (1 row)
 ```
 
@@ -346,10 +346,10 @@ By default, a result with one significant figure is produced.
 If we instead want two significant figures:
 
 ```sql
-SELECT pit.ns('numeric_add', ARRAY['1.5','2.5'], 2);
- ns
-----
- 24
+SELECT pit.h('numeric_add', ARRAY['1.5','2.5'], 2);
+   h
+-------
+ 24 ns
 (1 row)
 ```
 
@@ -380,18 +380,27 @@ let's convert them to seconds to allow visual comparison:
 ```
 0.000024    <-- EXPLAIN ANALYZE "Exeuction Time"
 0.000909    <-- \timing
-0.000000024 <-- the actual time on this machine, expressed in two sig. figs.
+0.000000024 <-- pit.h()
 ```
 
-But how do we know the claimed exeuction time by `pit` is reasonable?
+But how do we know the claimed exeuction time by `pit.h()` is reasonable?
 
-Let's demonstrate how we can verify it manually.
+Let's demonstrate how we can verify it manually, only standard PostgreSQL
+and its existing system catalog functions.
 
 If it's true that the exeuction time is 24 ns, it should take about 2.4 s
 to do 1e8 executions. We will use `generate_series()` for the executions,
-but we first have to solve two problems. First, we have to account for the
-overhead of `generate_series()`. Secondly, we must avoid caching of the
-immutable expression, and use the volatile version we created earlier.
+but we first have to solve two problems. We have to account for the
+overhead of `generate_series()`. We must also avoid caching of the
+immutable expression, and create a volatile version of `numeric_add`.
+
+```sql
+CREATE FUNCTION numeric_add_volatile(numeric,numeric)
+RETURNS numeric
+VOLATILE
+LANGUAGE internal
+AS 'numeric_add';
+```
 
 Let's measure the overhead time of generate_series:
 
@@ -420,7 +429,7 @@ Time: 11688.894 ms (00:11.689)
 ```
 
 If we now instead invoke our volatile version of it, we will notice how it
-takes about 3 seconds longer time, which nicely matches the `pit.now()`
+takes about 3 seconds longer time, which nicely matches the `pit.h()`
 returned result:
 
 ```sql
@@ -442,5 +451,6 @@ SELECT 14.525-11.344;
 Note how `3.181 s` is quite close to the predicted time `2.4 s`.
 
 Under the hood, `pit` measures the execution time by executing the function
-using C, and doesn't use `generate_series()` at all, it is only a suggestion
-on how SQL users could try to verify the correctness of the `pit` measurements.
+using C, and doesn't use `generate_series()` at all. This was only meant to
+demonstrate how users could verify the correctness of the pit measurements,
+using tools available in standard PostgreSQL.
