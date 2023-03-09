@@ -45,9 +45,14 @@ measure_or_eval(PG_FUNCTION_ARGS)
     bool                anynull;
     FunctionCallInfo    testfunc_fcinfo;
     FmgrInfo            *testfunc_finfo;
-    Datum               result;
+    Datum               result = 0;
     char                *result_c_string;
     bool                is_var_lena;
+
+    if (number_of_executions <= 0)
+        elog(ERROR,
+            "number_of_executions must be at least one, but is %ld",
+            number_of_executions);
 
     /* Convert internal function name to C string. */
     internal_function_name_c_string = text_to_cstring(internal_function_name);
