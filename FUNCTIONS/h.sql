@@ -10,13 +10,5 @@ CREATE OR REPLACE FUNCTION pit.h(
 RETURNS text
 LANGUAGE sql
 AS $$
-WITH t(s) AS MATERIALIZED (VALUES(pit.s($1,$2,$3)))
-SELECT
-    CASE
-        WHEN log10(s) >= 0 THEN format('%s s', s)
-        WHEN log10(s) >= -3 THEN format('%s ms', trim_scale(s * 1e3))
-        WHEN log10(s) >= -6 THEN format('%s µs', trim_scale(s * 1e6))
-        ELSE format('%s ns', trim_scale(s * 1e9))
-    END
-FROM t
+SELECT pit.pretty_time(pit.s($1,$2,$3))
 $$;

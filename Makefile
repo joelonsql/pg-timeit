@@ -26,6 +26,7 @@ SQL_SRC = \
 	FUNCTIONS/overhead.sql \
 	FUNCTIONS/eval.sql \
 	FUNCTIONS/s.sql \
+	FUNCTIONS/pretty_time.sql \
 	FUNCTIONS/h.sql \
 	FUNCTIONS/async.sql \
 	PROCEDURES/work.sql

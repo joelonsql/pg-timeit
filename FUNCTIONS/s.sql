@@ -57,6 +57,13 @@ begin
 
                 return final_result;
 
+            else
+
+                raise notice '% (% executions)', pit.pretty_time(pit.round_to_sig_figs(
+                    (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
+                    significant_figures
+                )), executions;
+
             end if;
 
         end if;
