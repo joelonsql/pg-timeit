@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION pit.async(
     function_name text,
     input_values text[] DEFAULT ARRAY[]::text[],
-    significant_figures integer DEFAULT 1
+    significant_figures integer DEFAULT 1,
+    timeout interval DEFAULT NULL
 )
 RETURNS bigint
 LANGUAGE plpgsql
@@ -23,9 +24,9 @@ begin
     RETURNING tests.id INTO id;
 
     INSERT INTO pit.test_params
-        (id, function_name, input_values, significant_figures)
+        (id, function_name, input_values, significant_figures, timeout)
     VALUES
-        (id, function_name, input_values, significant_figures);
+        (id, function_name, input_values, significant_figures, timeout);
 
     return id;
 

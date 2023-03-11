@@ -219,13 +219,14 @@ Use with:
 
 <h2 id="api">5. API</h2>
 
-<h3 id="pit-s"><code>pit.s(function_name [, input_values ] [, significant_figures]) → numeric</code></h3>
+<h3 id="pit-s"><code>pit.s(function_name [, input_values ] [, significant_figures] [, timeout]) → numeric</code></h3>
 
-  Input Parameter     | Type    | Default
---------------------- | ------- | -----------
- function_name        | text    |
- input_values         | text[]  | ARRAY[]::text[]
- significant_figures  | integer | 1
+  Input Parameter     | Type     | Default
+--------------------- | -------- | -----------
+ function_name        | text     |
+ input_values         | text[]   | ARRAY[]::text[]
+ significant_figures  | integer  | 1
+ timeout              | interval | NULL
 
 Immediately measure the execution run time of the built-in internal function named `function_name`.
 
@@ -235,17 +236,20 @@ Optionally, arguments can be passed by specifying `input_values`.
 
 The desired precision of the returned final result can be specified via `significant_figures`, which defaults to 1.
 
-<h3 id="pit-h"><code>pit.h(function_name [, input_values ] [, significant_figures]) → text</code></h3>
+A maximum timeout interval for a single measurement can be specified via the `timeout` input parameter, which defaults to NULL, which means no timeout.
+
+<h3 id="pit-h"><code>pit.h(function_name [, input_values ] [, significant_figures] [, timeout]) → text</code></h3>
 
 Like `pit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
 
-<h3 id="pit-async"><code>pit.async(function_name [, input_values ] [, significant_figures]) → bigint</code></h3>
+<h3 id="pit-async"><code>pit.async(function_name [, input_values ] [, significant_figures] [, timeout]) → bigint</code></h3>
 
-  Input Parameter     | Type    | Default
---------------------- | ------- | -----------
- function_name        | text    |
- input_values         | text[]  | ARRAY[]::text[]
- significant_figures  | integer | 1
+  Input Parameter     | Type     | Default
+--------------------- | -------- | -----------
+ function_name        | text     |
+ input_values         | text[]   | ARRAY[]::text[]
+ significant_figures  | integer  | 1
+ timeout              | interval | NULL
 
 Request measurement of the execution run time of `function_name`.
 

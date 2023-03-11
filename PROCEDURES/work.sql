@@ -22,6 +22,8 @@ declare
     idle boolean := true;
     queue_count bigint;
     return_value text;
+    timeout interval;
+    would_timeout boolean;
 begin
 
 loop
@@ -59,7 +61,8 @@ loop
         test_time_1,
         overhead_time_1,
         test_time_2,
-        overhead_time_2
+        overhead_time_2,
+        timeout
     in
         SELECT
             tests.id,
@@ -71,7 +74,8 @@ loop
             tests.test_time_1,
             tests.overhead_time_1,
             tests.test_time_2,
-            tests.overhead_time_2
+            tests.overhead_time_2,
+            test_params.timeout
         FROM pit.tests
         JOIN pit.test_params ON test_params.id = tests.id
         WHERE tests.test_state <> 'final'
@@ -116,6 +120,8 @@ loop
                 net_time_1 := test_time_1 - overhead_time_1;
                 net_time_2 := test_time_2 - overhead_time_2;
 
+                would_timeout := least(net_time_1,net_time_2) * 2 > extract(epoch from timeout) * 1e6;
+
                 if
                     least(net_time_1,net_time_2)
                     >
@@ -124,7 +130,13 @@ loop
                     pit.round_to_sig_figs(net_time_1, significant_figures)
                     =
                     pit.round_to_sig_figs(net_time_2, significant_figures)
+                or
+                    would_timeout
                 then
+
+                    if would_timeout then
+                        raise notice '% timeout test id %', clock_timestamp()::timestamptz(0), fn.id;
+                    end if;
 
                     final_result := pit.round_to_sig_figs(
                         (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
