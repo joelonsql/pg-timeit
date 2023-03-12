@@ -23,7 +23,6 @@ declare
     queue_count bigint;
     return_value text;
     timeout interval;
-    would_timeout boolean;
 begin
 
 loop
@@ -120,7 +119,39 @@ loop
                 net_time_1 := test_time_1 - overhead_time_1;
                 net_time_2 := test_time_2 - overhead_time_2;
 
-                would_timeout := least(net_time_1,net_time_2) * 2 > extract(epoch from timeout) * 1e6;
+                if
+                    least(net_time_1,net_time_2) * 2
+                    >
+                    extract(epoch from timeout) * 1e6
+                then
+
+                    significant_figures := significant_figures - 1;
+
+                    if significant_figures < 1 then
+                        raise exception 'timeout, unable to produce result';
+                    end if;
+
+                    raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
+
+                    UPDATE pit.test_params SET
+                        significant_figures = fn.significant_figures
+                    WHERE test_params.id = fn.id;
+
+                    UPDATE pit.tests SET
+                        test_state = 'init',
+                        executions = NULL,
+                        test_time_1 = NULL,
+                        overhead_time_1 = NULL,
+                        test_time_2 = NULL,
+                        overhead_time_2 = NULL,
+                        final_result = NULL,
+                        last_run = NULL,
+                        error = NULL
+                    WHERE tests.id = fn.id;
+
+                    continue;
+
+                end if;
 
                 if
                     least(net_time_1,net_time_2)
@@ -130,13 +161,7 @@ loop
                     pit.round_to_sig_figs(net_time_1, significant_figures)
                     =
                     pit.round_to_sig_figs(net_time_2, significant_figures)
-                or
-                    would_timeout
                 then
-
-                    if would_timeout then
-                        raise notice '% timeout test id %', clock_timestamp()::timestamptz(0), fn.id;
-                    end if;
 
                     final_result := pit.round_to_sig_figs(
                         (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,

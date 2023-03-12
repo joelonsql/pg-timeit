@@ -21,12 +21,14 @@ declare
     net_time_2 bigint;
     final_result numeric;
     overhead_expression text;
-    would_timeout boolean;
 begin
 
     if num_nulls(function_name,input_values,significant_figures) <> 0
     then
         raise exception 'no arguments must be null';
+    end if;
+    if significant_figures < 1 then
+        raise exception 'significant_figures must be positive';
     end if;
 
     executions := 1;
@@ -42,7 +44,22 @@ begin
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
 
-        would_timeout := least(net_time_1,net_time_2) * 2 > extract(epoch from timeout) * 1e6;
+        if
+            least(net_time_1,net_time_2) * 2
+            >
+            extract(epoch from timeout) * 1e6
+        then
+
+            significant_figures := significant_figures - 1;
+            executions := 1;
+            if significant_figures < 1 then
+                raise notice 'timeout, unable to produce result';
+                return null;
+            end if;
+            raise notice 'timeout, will try significant_figures %', significant_figures;
+            continue;
+
+        end if;
 
         if
             least(net_time_1,net_time_2)
@@ -52,13 +69,7 @@ begin
             pit.round_to_sig_figs(net_time_1, significant_figures)
             =
             pit.round_to_sig_figs(net_time_2, significant_figures)
-        or
-            would_timeout
         then
-
-            if would_timeout then
-                raise notice '(timeout)';
-            end if;
 
             final_result := pit.round_to_sig_figs(
                 (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
