@@ -8,6 +8,7 @@ LANGUAGE sql
 AS $$
 SELECT
     CASE
+        WHEN $1 IS NULL THEN 'NULL'
         WHEN log10(nullif(abs($1),0)) >= 0 THEN format('%s s', $1)
         WHEN log10(nullif(abs($1),0)) >= -3 THEN format('%s ms', trim_scale($1 * 1e3))
         WHEN log10(nullif(abs($1),0)) >= -6 THEN format('%s µs', trim_scale($1 * 1e6))
