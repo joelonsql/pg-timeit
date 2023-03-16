@@ -194,7 +194,7 @@ loop
                 if
                     least(net_time_1,net_time_2)
                     >
-                    (10 ^ significant_figures)
+                    (10 ^ significant_figures) * 2
                 and
                     pit.round_to_sig_figs(net_time_1, significant_figures)
                     =
