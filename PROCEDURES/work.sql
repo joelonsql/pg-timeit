@@ -23,6 +23,8 @@ declare
     queue_count bigint;
     return_value text;
     timeout interval;
+    attempts integer;
+    remaining_attempts integer;
 begin
 
 loop
@@ -61,7 +63,9 @@ loop
         overhead_time_1,
         test_time_2,
         overhead_time_2,
-        timeout
+        timeout,
+        attempts,
+        remaining_attempts
     in
         SELECT
             tests.id,
@@ -74,11 +78,13 @@ loop
             tests.overhead_time_1,
             tests.test_time_2,
             tests.overhead_time_2,
-            test_params.timeout
+            test_params.timeout,
+            test_params.attempts,
+            tests.remaining_attempts
         FROM pit.tests
         JOIN pit.test_params ON test_params.id = tests.id
         WHERE tests.test_state <> 'final'
-        ORDER BY random()
+        ORDER BY tests.id
     loop
 
         begin
@@ -101,7 +107,12 @@ loop
 
             elsif test_state = 'run_test_1' then
 
+                /* Warm-up two times with identical calls. */
                 test_time_1 := pit.measure(function_name, input_values, executions);
+                test_time_1 := pit.measure(function_name, input_values, executions);
+                /* Measure. */
+                test_time_1 := pit.measure(function_name, input_values, executions);
+
                 overhead_time_1 := pit.overhead(executions);
 
                 UPDATE pit.tests SET
@@ -113,7 +124,12 @@ loop
 
             elsif test_state = 'run_test_2' then
 
+                /* Warm-up two times with identical calls. */
                 test_time_2 := pit.measure(function_name, input_values, executions);
+                test_time_2 := pit.measure(function_name, input_values, executions);
+                /* Measure. */
+                test_time_2 := pit.measure(function_name, input_values, executions);
+
                 overhead_time_2 := pit.overhead(executions);
 
                 net_time_1 := test_time_1 - overhead_time_1;
@@ -125,29 +141,51 @@ loop
                     extract(epoch from timeout) * 1e6
                 then
 
-                    significant_figures := significant_figures - 1;
+                    if remaining_attempts = 0 then
 
-                    if significant_figures < 1 then
-                        raise exception 'timeout, unable to produce result';
+                        significant_figures := significant_figures - 1;
+                        remaining_attempts := attempts;
+
+                        if significant_figures < 1 then
+                            raise exception 'timeout, unable to produce result';
+                        end if;
+
+                        raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
+
+                        UPDATE pit.test_params SET
+                            significant_figures = fn.significant_figures
+                        WHERE test_params.id = fn.id;
+
+                        UPDATE pit.tests SET
+                            test_state = 'init',
+                            executions = NULL,
+                            test_time_1 = NULL,
+                            overhead_time_1 = NULL,
+                            test_time_2 = NULL,
+                            overhead_time_2 = NULL,
+                            remaining_attempts = fn.remaining_attempts,
+                            final_result = NULL,
+                            last_run = NULL,
+                            error = NULL
+                        WHERE tests.id = fn.id;
+
+                    else
+
+                        remaining_attempts := remaining_attempts - 1;
+                        executions := 1;
+
+                        raise notice 'timeout test id %, % remaining attempts at same precision', id, remaining_attempts;
+
+                        UPDATE pit.tests SET
+                            test_state = 'run_test_1',
+                            executions = fn.executions,
+                            remaining_attempts = fn.remaining_attempts,
+                            test_time_2 = fn.test_time_2,
+                            overhead_time_2 = fn.overhead_time_2,
+                            last_run = clock_timestamp()
+                        WHERE tests.id = fn.id;
+
                     end if;
-
-                    raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
-
-                    UPDATE pit.test_params SET
-                        significant_figures = fn.significant_figures
-                    WHERE test_params.id = fn.id;
-
-                    UPDATE pit.tests SET
-                        test_state = 'init',
-                        executions = NULL,
-                        test_time_1 = NULL,
-                        overhead_time_1 = NULL,
-                        test_time_2 = NULL,
-                        overhead_time_2 = NULL,
-                        final_result = NULL,
-                        last_run = NULL,
-                        error = NULL
-                    WHERE tests.id = fn.id;
 
                     continue;
 

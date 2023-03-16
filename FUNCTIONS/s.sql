@@ -5,7 +5,8 @@ CREATE OR REPLACE FUNCTION pit.s(
     function_name text,
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1,
-    timeout interval DEFAULT NULL
+    timeout interval DEFAULT NULL,
+    attempts integer DEFAULT 1
 )
 RETURNS numeric
 LANGUAGE plpgsql
@@ -21,6 +22,7 @@ declare
     net_time_2 bigint;
     final_result numeric;
     overhead_expression text;
+    remaining_attempts integer;
 begin
 
     if num_nulls(function_name,input_values,significant_figures) <> 0
@@ -32,6 +34,7 @@ begin
     end if;
 
     executions := 1;
+    remaining_attempts := attempts;
 
     loop
 
@@ -50,13 +53,20 @@ begin
             extract(epoch from timeout) * 1e6
         then
 
-            significant_figures := significant_figures - 1;
             executions := 1;
-            if significant_figures < 1 then
-                raise notice 'timeout, unable to produce result';
-                return null;
+            if remaining_attempts = 0 then
+                remaining_attempts := attempts;
+                significant_figures := significant_figures - 1;
+                if significant_figures < 1 then
+                    raise notice 'timeout, unable to produce result';
+                    return null;
+                end if;
+                raise notice 'timeout, will try significant_figures %', significant_figures;
+            else
+                remaining_attempts := remaining_attempts - 1;
+                raise notice 'timeout, % remaining attempts at same precision', remaining_attempts;
             end if;
-            raise notice 'timeout, will try significant_figures %', significant_figures;
+
             continue;
 
         end if;
