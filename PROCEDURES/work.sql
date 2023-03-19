@@ -24,6 +24,7 @@ declare
     return_value text;
     timeout interval;
     attempts integer;
+    min_time interval;
     remaining_attempts integer;
 begin
 
@@ -65,6 +66,7 @@ loop
         overhead_time_2,
         timeout,
         attempts,
+        min_time,
         remaining_attempts
     in
         SELECT
@@ -80,6 +82,7 @@ loop
             tests.overhead_time_2,
             test_params.timeout,
             test_params.attempts,
+            test_params.min_time,
             tests.remaining_attempts
         FROM pit.tests
         JOIN pit.test_params ON test_params.id = tests.id
@@ -91,7 +94,7 @@ loop
 
             if test_state = 'init' then
 
-                executions := 1;
+                executions := pit.min_executions(function_name, input_values, min_time);
 
                 UPDATE pit.tests SET
                     test_state = 'run_test_1',
@@ -136,66 +139,6 @@ loop
                 net_time_2 := test_time_2 - overhead_time_2;
 
                 if
-                    least(net_time_1,net_time_2) * 2
-                    >
-                    extract(epoch from timeout) * 1e6
-                then
-
-                    if remaining_attempts = 0 then
-
-                        significant_figures := significant_figures - 1;
-                        remaining_attempts := attempts;
-
-                        if significant_figures < 1 then
-                            raise exception 'timeout, unable to produce result';
-                        end if;
-
-                        raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
-
-                        UPDATE pit.test_params SET
-                            significant_figures = fn.significant_figures
-                        WHERE test_params.id = fn.id;
-
-                        UPDATE pit.tests SET
-                            test_state = 'init',
-                            executions = NULL,
-                            test_time_1 = NULL,
-                            overhead_time_1 = NULL,
-                            test_time_2 = NULL,
-                            overhead_time_2 = NULL,
-                            remaining_attempts = fn.remaining_attempts,
-                            final_result = NULL,
-                            last_run = NULL,
-                            error = NULL
-                        WHERE tests.id = fn.id;
-
-                    else
-
-                        remaining_attempts := remaining_attempts - 1;
-                        executions := 1;
-
-                        raise notice 'timeout test id %, % remaining attempts at same precision', id, remaining_attempts;
-
-                        UPDATE pit.tests SET
-                            test_state = 'run_test_1',
-                            executions = fn.executions,
-                            remaining_attempts = fn.remaining_attempts,
-                            test_time_2 = fn.test_time_2,
-                            overhead_time_2 = fn.overhead_time_2,
-                            last_run = clock_timestamp()
-                        WHERE tests.id = fn.id;
-
-                    end if;
-
-                    continue;
-
-                end if;
-
-                if
-                    least(net_time_1,net_time_2)
-                    >
-                    (10 ^ significant_figures) * 2
-                and
                     pit.round_to_sig_figs(net_time_1, significant_figures)
                     =
                     pit.round_to_sig_figs(net_time_2, significant_figures)
@@ -215,6 +158,62 @@ loop
                     WHERE tests.id = fn.id;
 
                 else
+
+                    if
+                        least(net_time_1,net_time_2) * 2
+                        >
+                        extract(epoch from timeout) * 1e6
+                    then
+
+                        if remaining_attempts = 0 then
+
+                            significant_figures := significant_figures - 1;
+                            remaining_attempts := attempts;
+
+                            if significant_figures < 1 then
+                                raise exception 'timeout, unable to produce result';
+                            end if;
+
+                            raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
+
+                            UPDATE pit.test_params SET
+                                significant_figures = fn.significant_figures
+                            WHERE test_params.id = fn.id;
+
+                            UPDATE pit.tests SET
+                                test_state = 'init',
+                                executions = NULL,
+                                test_time_1 = NULL,
+                                overhead_time_1 = NULL,
+                                test_time_2 = NULL,
+                                overhead_time_2 = NULL,
+                                remaining_attempts = fn.remaining_attempts,
+                                final_result = NULL,
+                                last_run = NULL,
+                                error = NULL
+                            WHERE tests.id = fn.id;
+
+                        else
+
+                            remaining_attempts := remaining_attempts - 1;
+                            executions := 1;
+
+                            raise notice 'timeout test id %, % remaining attempts at same precision', id, remaining_attempts;
+
+                            UPDATE pit.tests SET
+                                test_state = 'run_test_1',
+                                executions = fn.executions,
+                                remaining_attempts = fn.remaining_attempts,
+                                test_time_2 = fn.test_time_2,
+                                overhead_time_2 = fn.overhead_time_2,
+                                last_run = clock_timestamp()
+                            WHERE tests.id = fn.id;
+
+                        end if;
+
+                        continue;
+
+                    end if;
 
                     executions := executions * 2;
 

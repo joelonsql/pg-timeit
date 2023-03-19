@@ -23,13 +23,17 @@ SQL_SRC = \
 	TABLES/test_params.sql \
 	FUNCTIONS/round_to_sig_figs.sql \
 	FUNCTIONS/measure.sql \
+	FUNCTIONS/min_executions.sql \
 	FUNCTIONS/overhead.sql \
 	FUNCTIONS/eval.sql \
 	FUNCTIONS/s.sql \
 	FUNCTIONS/pretty_time.sql \
 	FUNCTIONS/h.sql \
 	FUNCTIONS/async.sql \
-	PROCEDURES/work.sql
+	PROCEDURES/work.sql \
+	FUNCTIONS/argument_signature.sql \
+	FUNCTIONS/function_signature.sql \
+	VIEWS/report.sql
 
 pit--1.0.sql: $(SQL_SRC)
 	cat $^ > $@

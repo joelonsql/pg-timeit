@@ -4,6 +4,7 @@ CREATE TABLE pit.test_params (
     function_name text NOT NULL,
     significant_figures integer NOT NULL,
     attempts integer NOT NULL,
+    min_time interval NOT NULL,
     return_value text,
     timeout interval,
     PRIMARY KEY (id),

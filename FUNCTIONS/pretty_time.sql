@@ -15,3 +15,10 @@ SELECT
         ELSE format('%s ns', trim_scale($1 * 1e9))
     END
 $$;
+
+CREATE OR REPLACE FUNCTION pit.pretty_time(numeric, significant_figures integer)
+RETURNS text
+LANGUAGE sql
+AS $$
+SELECT pit.pretty_time(pit.round_to_sig_figs($1, $2))
+$$;

@@ -7,10 +7,11 @@ CREATE OR REPLACE FUNCTION pit.h(
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1,
     timeout interval DEFAULT NULL,
-    attempts integer DEFAULT 1
+    attempts integer DEFAULT 1,
+    min_time interval DEFAULT '10 ms'::interval
 )
 RETURNS text
 LANGUAGE sql
 AS $$
-SELECT pit.pretty_time(pit.s($1,$2,$3,$4,$5))
+SELECT pit.pretty_time(pit.s($1,$2,$3,$4,$5,$6))
 $$;

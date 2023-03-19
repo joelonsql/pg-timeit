@@ -6,7 +6,8 @@ CREATE OR REPLACE FUNCTION pit.s(
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1,
     timeout interval DEFAULT NULL,
-    attempts integer DEFAULT 1
+    attempts integer DEFAULT 1,
+    min_time interval DEFAULT '10 ms'::interval
 )
 RETURNS numeric
 LANGUAGE plpgsql
@@ -23,6 +24,7 @@ declare
     final_result numeric;
     overhead_expression text;
     remaining_attempts integer;
+    min_t bigint := extract(epoch from min_time) * 1e6;
 begin
 
     if num_nulls(function_name,input_values,significant_figures) <> 0
@@ -33,7 +35,12 @@ begin
         raise exception 'significant_figures must be positive';
     end if;
 
-    executions := 1;
+    if not timeout > min_time * 2 then
+        raise exception 'timeout must be larger than at least twice the min_time';
+    end if;
+
+    executions := pit.min_executions(function_name, input_values, min_time);
+
     remaining_attempts := attempts;
 
     loop
@@ -48,34 +55,6 @@ begin
         net_time_2 := test_time_2 - overhead_time_2;
 
         if
-            least(net_time_1,net_time_2) * 2
-            >
-            extract(epoch from timeout) * 1e6
-        then
-
-            executions := 1;
-            if remaining_attempts = 0 then
-                remaining_attempts := attempts;
-                significant_figures := significant_figures - 1;
-                if significant_figures < 1 then
-                    raise notice 'timeout, unable to produce result';
-                    return null;
-                end if;
-                raise notice 'timeout, will try significant_figures %', significant_figures;
-            else
-                remaining_attempts := remaining_attempts - 1;
-                raise notice 'timeout, % remaining attempts at same precision', remaining_attempts;
-            end if;
-
-            continue;
-
-        end if;
-
-        if
-            least(net_time_1,net_time_2)
-            >
-            (10 ^ significant_figures) * 2
-        and
             pit.round_to_sig_figs(net_time_1, significant_figures)
             =
             pit.round_to_sig_figs(net_time_2, significant_figures)
@@ -94,6 +73,30 @@ begin
                 (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                 significant_figures
             )), executions;
+
+        end if;
+
+        if
+            least(net_time_1,net_time_2) * 2
+            >
+            extract(epoch from timeout) * 1e6
+        then
+
+            executions := pit.min_executions(function_name, input_values, min_time);
+            if remaining_attempts = 0 then
+                remaining_attempts := attempts;
+                significant_figures := significant_figures - 1;
+                if significant_figures < 1 then
+                    raise notice 'timeout, unable to produce result';
+                    return null;
+                end if;
+                raise notice 'timeout, will try significant_figures %', significant_figures;
+            else
+                remaining_attempts := remaining_attempts - 1;
+                raise notice 'timeout, % remaining attempts at same precision', remaining_attempts;
+            end if;
+
+            continue;
 
         end if;
 
