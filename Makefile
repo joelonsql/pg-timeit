@@ -31,8 +31,7 @@ SQL_SRC = \
 	FUNCTIONS/h.sql \
 	FUNCTIONS/async.sql \
 	PROCEDURES/work.sql \
-	FUNCTIONS/argument_signature.sql \
-	FUNCTIONS/function_signature.sql \
+	PROCEDURES/measure_cold.sql \
 	VIEWS/report.sql
 
 pit--1.0.sql: $(SQL_SRC)

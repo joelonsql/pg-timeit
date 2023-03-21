@@ -1,10 +1,15 @@
+/*
+ *  View that shows the variance of the measurements. Note that this says
+ *  very little about the variance of the execution time for the functions being
+ *  measured, which is something completely different and not shown here.
+ */
 CREATE OR REPLACE VIEW pit.report AS
 WITH
 data AS
 (
     SELECT
-        tests.id,
-        pit.function_signature(test_params.function_name, test_params.input_values),
+        test_params.function_name,
+        test_params.input_values,
         tests.final_result,
         test_params.significant_figures,
         tests.executions
@@ -14,7 +19,8 @@ data AS
 stats AS
 (
     SELECT
-        function_signature,
+        function_name,
+        input_values,
         AVG(final_result) AS avg,
         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY final_result)::numeric AS median,
         STDDEV_SAMP(final_result) AS stddev,
@@ -22,7 +28,7 @@ stats AS
         MIN(significant_figures) AS significant_figures,
         AVG(executions)::bigint AS executions
     FROM data
-    GROUP BY function_signature
+    GROUP BY function_name, input_values
 ),
 ci AS
 (
@@ -33,7 +39,8 @@ ci AS
     FROM stats
 )
 SELECT
-    function_signature,
+    function_name,
+    input_values,
     pit.pretty_time(avg, significant_figures) AS avg,
     pit.pretty_time(median, significant_figures) AS median,
     pit.pretty_time(stddev, significant_figures) AS stddev,
@@ -42,5 +49,6 @@ SELECT
         pit.pretty_time(ci_upper, significant_figures)
     ) AS ci,
     n,
-    executions
+    executions,
+    avg AS avg_numeric
 FROM ci;
