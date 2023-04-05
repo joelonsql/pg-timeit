@@ -139,6 +139,10 @@ loop
                 net_time_2 := test_time_2 - overhead_time_2;
 
                 if
+                    LEAST(net_time_1,net_time_2)
+                    >
+                    extract(epoch from min_time) * 1e6
+                and
                     pit.round_to_sig_figs(net_time_1, significant_figures)
                     =
                     pit.round_to_sig_figs(net_time_2, significant_figures)
