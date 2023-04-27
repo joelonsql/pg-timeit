@@ -2,7 +2,7 @@
 -- Returns measured execution_time in human-readable output,
 -- using time unit suffixes, i.e. "ns", "us", "ms".
 --
-CREATE OR REPLACE FUNCTION pit.h(
+CREATE OR REPLACE FUNCTION timeit.h(
     function_name text,
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1,
@@ -13,5 +13,5 @@ CREATE OR REPLACE FUNCTION pit.h(
 RETURNS text
 LANGUAGE sql
 AS $$
-SELECT pit.pretty_time(pit.s($1,$2,$3,$4,$5,$6))
+SELECT timeit.pretty_time(timeit.s($1,$2,$3,$4,$5,$6))
 $$;

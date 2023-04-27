@@ -1,20 +1,20 @@
-EXTENSION = pit
-MODULES = pit
+EXTENSION = timeit
+MODULES = timeit
 DATA = \
-	pit--1.0.sql
+	timeit--1.0.sql
 
 REGRESS = \
 	immediate \
 	async \
 	eval
 
-EXTRA_CLEAN = pit--1.0.sql
+EXTRA_CLEAN = timeit--1.0.sql
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
-all: pit--1.0.sql
+all: timeit--1.0.sql
 
 SQL_SRC = \
 	complain_header.sql \
@@ -34,5 +34,5 @@ SQL_SRC = \
 	PROCEDURES/measure_cold.sql \
 	VIEWS/report.sql
 
-pit--1.0.sql: $(SQL_SRC)
+timeit--1.0.sql: $(SQL_SRC)
 	cat $^ > $@

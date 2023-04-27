@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION pit.min_executions(
+CREATE OR REPLACE FUNCTION timeit.min_executions(
     function_name text,
     input_values text[],
     min_time interval
@@ -18,7 +18,7 @@ begin
 
     loop
 
-        test_time := pit.measure(function_name, input_values, executions);
+        test_time := timeit.measure(function_name, input_values, executions);
 
         if test_time >= min_t then
             return executions;

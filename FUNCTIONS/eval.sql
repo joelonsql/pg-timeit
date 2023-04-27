@@ -1,7 +1,7 @@
-CREATE OR REPLACE FUNCTION pit.eval(
+CREATE OR REPLACE FUNCTION timeit.eval(
     internal_function text,
     input_values text[]
 )
 RETURNS text
 LANGUAGE c
-AS '$libdir/pit', 'measure_or_eval';
+AS '$libdir/timeit', 'measure_or_eval';

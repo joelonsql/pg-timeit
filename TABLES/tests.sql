@@ -1,6 +1,6 @@
-CREATE TABLE pit.tests (
+CREATE TABLE timeit.tests (
     id bigint NOT NULL GENERATED ALWAYS AS IDENTITY,
-    test_state pit.test_state NOT NULL,
+    test_state timeit.test_state NOT NULL,
     executions bigint,
     test_time_1 bigint,
     overhead_time_1 bigint,
@@ -17,4 +17,4 @@ CREATE TABLE pit.tests (
     CHECK (remaining_attempts >= 0)
 );
 
-CREATE INDEX ON pit.tests (last_run) WHERE test_state <> 'final';
+CREATE INDEX ON timeit.tests (last_run) WHERE test_state <> 'final';

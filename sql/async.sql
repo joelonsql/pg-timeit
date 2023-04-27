@@ -1,9 +1,9 @@
-CREATE EXTENSION pit;
+CREATE EXTENSION timeit;
 
 --
 -- Enqueue new test.
 --
-SELECT pit.async('pg_sleep',ARRAY['0.1']);
+SELECT timeit.async('pg_sleep',ARRAY['0.1']);
 
 --
 -- Work until there is no more work.
@@ -12,7 +12,7 @@ SELECT pit.async('pg_sleep',ARRAY['0.1']);
 -- many iterations that will be necessary.
 --
 SET client_min_messages TO 'warning';
-CALL pit.work(return_when_idle := true);
+CALL timeit.work(return_when_idle := true);
 
 --
 -- Have a look at test result.
@@ -22,6 +22,6 @@ SELECT
     test_state,
     executions,
     final_result
-FROM pit.tests;
+FROM timeit.tests;
 
-DROP EXTENSION pit;
+DROP EXTENSION timeit;

@@ -1,11 +1,11 @@
-CREATE OR REPLACE PROCEDURE pit.work(return_when_idle boolean DEFAULT false)
+CREATE OR REPLACE PROCEDURE timeit.work(return_when_idle boolean DEFAULT false)
 LANGUAGE plpgsql
 AS $$
 <<fn>>
 declare
 -- input:
     id bigint;
-    test_state pit.test_state;
+    test_state timeit.test_state;
     function_name text;
     input_values text[];
     significant_figures integer;
@@ -32,7 +32,7 @@ loop
 
     SELECT count(*)
     INTO queue_count
-    FROM pit.tests
+    FROM timeit.tests
     WHERE tests.test_state <> 'final';
 
     if queue_count <> 0 then
@@ -84,41 +84,41 @@ loop
             test_params.attempts,
             test_params.min_time,
             tests.remaining_attempts
-        FROM pit.tests
-        JOIN pit.test_params ON test_params.id = tests.id
+        FROM timeit.tests
+        JOIN timeit.test_params ON test_params.id = tests.id
         WHERE tests.test_state <> 'final'
-        ORDER BY tests.id
+        ORDER BY RANDOM()
     loop
 
         begin
 
             if test_state = 'init' then
 
-                executions := pit.min_executions(function_name, input_values, min_time);
+                executions := timeit.min_executions(function_name, input_values, min_time);
 
-                UPDATE pit.tests SET
+                UPDATE timeit.tests SET
                     test_state = 'run_test_1',
                     executions = fn.executions,
                     last_run = clock_timestamp()
                 WHERE tests.id = fn.id;
 
-                return_value := pit.eval(function_name, input_values);
+                return_value := timeit.eval(function_name, input_values);
 
-                UPDATE pit.test_params SET
+                UPDATE timeit.test_params SET
                     return_value = fn.return_value
                 WHERE test_params.id = fn.id;
 
             elsif test_state = 'run_test_1' then
 
                 /* Warm-up two times with identical calls. */
-                test_time_1 := pit.measure(function_name, input_values, executions);
-                test_time_1 := pit.measure(function_name, input_values, executions);
+                test_time_1 := timeit.measure(function_name, input_values, executions);
+                test_time_1 := timeit.measure(function_name, input_values, executions);
                 /* Measure. */
-                test_time_1 := pit.measure(function_name, input_values, executions);
+                test_time_1 := timeit.measure(function_name, input_values, executions);
 
-                overhead_time_1 := pit.overhead(executions);
+                overhead_time_1 := timeit.overhead(executions);
 
-                UPDATE pit.tests SET
+                UPDATE timeit.tests SET
                     test_state = 'run_test_2',
                     test_time_1 = fn.test_time_1,
                     overhead_time_1 = fn.overhead_time_1,
@@ -128,12 +128,12 @@ loop
             elsif test_state = 'run_test_2' then
 
                 /* Warm-up two times with identical calls. */
-                test_time_2 := pit.measure(function_name, input_values, executions);
-                test_time_2 := pit.measure(function_name, input_values, executions);
+                test_time_2 := timeit.measure(function_name, input_values, executions);
+                test_time_2 := timeit.measure(function_name, input_values, executions);
                 /* Measure. */
-                test_time_2 := pit.measure(function_name, input_values, executions);
+                test_time_2 := timeit.measure(function_name, input_values, executions);
 
-                overhead_time_2 := pit.overhead(executions);
+                overhead_time_2 := timeit.overhead(executions);
 
                 net_time_1 := test_time_1 - overhead_time_1;
                 net_time_2 := test_time_2 - overhead_time_2;
@@ -143,17 +143,17 @@ loop
                     >
                     extract(epoch from min_time) * 1e6
                 and
-                    pit.round_to_sig_figs(net_time_1, significant_figures)
+                    timeit.round_to_sig_figs(net_time_1, significant_figures)
                     =
-                    pit.round_to_sig_figs(net_time_2, significant_figures)
+                    timeit.round_to_sig_figs(net_time_2, significant_figures)
                 then
 
-                    final_result := pit.round_to_sig_figs(
+                    final_result := timeit.round_to_sig_figs(
                         (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                         significant_figures
                     );
 
-                    UPDATE pit.tests SET
+                    UPDATE timeit.tests SET
                         test_state = 'final',
                         test_time_2 = fn.test_time_2,
                         overhead_time_2 = fn.overhead_time_2,
@@ -180,11 +180,11 @@ loop
 
                             raise notice 'timeout test id %, will try significant_figures %', id, significant_figures;
 
-                            UPDATE pit.test_params SET
+                            UPDATE timeit.test_params SET
                                 significant_figures = fn.significant_figures
                             WHERE test_params.id = fn.id;
 
-                            UPDATE pit.tests SET
+                            UPDATE timeit.tests SET
                                 test_state = 'init',
                                 executions = NULL,
                                 test_time_1 = NULL,
@@ -204,7 +204,7 @@ loop
 
                             raise notice 'timeout test id %, % remaining attempts at same precision', id, remaining_attempts;
 
-                            UPDATE pit.tests SET
+                            UPDATE timeit.tests SET
                                 test_state = 'run_test_1',
                                 executions = fn.executions,
                                 remaining_attempts = fn.remaining_attempts,
@@ -221,7 +221,7 @@ loop
 
                     executions := executions * 2;
 
-                    UPDATE pit.tests SET
+                    UPDATE timeit.tests SET
                         test_state = 'run_test_1',
                         executions = fn.executions,
                         test_time_2 = fn.test_time_2,
@@ -239,7 +239,7 @@ loop
 
         exception when others then
 
-            UPDATE pit.tests SET
+            UPDATE timeit.tests SET
                 test_state = 'final',
                 error = SQLERRM
             WHERE tests.id = fn.id;

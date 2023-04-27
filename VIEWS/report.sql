@@ -3,7 +3,7 @@
  *  very little about the variance of the execution time for the functions being
  *  measured, which is something completely different and not shown here.
  */
-CREATE OR REPLACE VIEW pit.report AS
+CREATE OR REPLACE VIEW timeit.report AS
 WITH
 data AS
 (
@@ -13,8 +13,8 @@ data AS
         tests.final_result,
         test_params.significant_figures,
         tests.executions
-    FROM pit.tests
-    JOIN pit.test_params USING (id)
+    FROM timeit.tests
+    JOIN timeit.test_params USING (id)
 ),
 stats AS
 (
@@ -41,12 +41,12 @@ ci AS
 SELECT
     function_name,
     input_values,
-    pit.pretty_time(avg, significant_figures) AS avg,
-    pit.pretty_time(median, significant_figures) AS median,
-    pit.pretty_time(stddev, significant_figures) AS stddev,
+    timeit.pretty_time(avg, significant_figures) AS avg,
+    timeit.pretty_time(median, significant_figures) AS median,
+    timeit.pretty_time(stddev, significant_figures) AS stddev,
     format('[%s-%s]',
-        pit.pretty_time(ci_lower, significant_figures),
-        pit.pretty_time(ci_upper, significant_figures)
+        timeit.pretty_time(ci_lower, significant_figures),
+        timeit.pretty_time(ci_upper, significant_figures)
     ) AS ci,
     n,
     executions,

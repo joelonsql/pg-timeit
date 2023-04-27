@@ -1,9 +1,9 @@
-Description=pit worker
-After=pit.service
+Description=timeit worker
+After=timeit.service
 
 [Service]
 User=postgres
-ExecStart=/usr/local/bin/pit-worker.sh
+ExecStart=/usr/local/bin/timeit-worker.sh
 ExecReload=/bin/kill -SIGUSR1 $MAINPID
 
 [Install]

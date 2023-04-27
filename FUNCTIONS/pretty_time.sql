@@ -2,7 +2,7 @@
 -- Returns measured execution_time in human-readable output,
 -- using time unit suffixes, i.e. "ns", "us", "ms".
 --
-CREATE OR REPLACE FUNCTION pit.pretty_time(numeric)
+CREATE OR REPLACE FUNCTION timeit.pretty_time(numeric)
 RETURNS text
 LANGUAGE sql
 AS $$
@@ -16,9 +16,9 @@ SELECT
     END
 $$;
 
-CREATE OR REPLACE FUNCTION pit.pretty_time(numeric, significant_figures integer)
+CREATE OR REPLACE FUNCTION timeit.pretty_time(numeric, significant_figures integer)
 RETURNS text
 LANGUAGE sql
 AS $$
-SELECT pit.pretty_time(pit.round_to_sig_figs($1, $2))
+SELECT timeit.pretty_time(timeit.round_to_sig_figs($1, $2))
 $$;

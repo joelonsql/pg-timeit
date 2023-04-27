@@ -10,13 +10,13 @@
 PG_MODULE_MAGIC;
 
 /*
- * Helper-function for the two SQL functions pit.measure() and pit.eval().
+ * Helper-function for the two SQL functions timeit.measure() and timeit.eval().
  *
- * When called by pit.eval(), only the first two arguments are specified.
+ * When called by timeit.eval(), only the first two arguments are specified.
  * It will then execute the specified internal function once with the
  * input values, and return the result as a text Datum.
  *
- * When called by pit.measure(), all three argumnents are specified.
+ * When called by timeit.measure(), all three argumnents are specified.
  * It will then execute the specified internal function as many times as
  * specified, and return the measured time in microseconds as a int64 Datum.
  */

@@ -2,8 +2,9 @@
 regression.diffs
 regression.out
 results
-pit--*.sql
-pit-worker.log
-pit.o
-pit.so
-pit.dylib
+timeit--*.sql
+timeit-worker.log
+timeit.o
+timeit.so
+timeit.dylib
+.vscode

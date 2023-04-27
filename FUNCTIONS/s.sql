@@ -1,7 +1,7 @@
 --
 -- Returns measured execution_time in seconds.
 --
-CREATE OR REPLACE FUNCTION pit.s(
+CREATE OR REPLACE FUNCTION timeit.s(
     function_name text,
     input_values text[] DEFAULT ARRAY[]::text[],
     significant_figures integer DEFAULT 1,
@@ -39,28 +39,28 @@ begin
         raise exception 'timeout must be larger than at least twice the min_time';
     end if;
 
-    executions := pit.min_executions(function_name, input_values, min_time);
+    executions := timeit.min_executions(function_name, input_values, min_time);
 
     remaining_attempts := attempts;
 
     loop
 
-        test_time_1 := pit.measure(function_name, input_values, executions);
-        overhead_time_1 := pit.overhead(executions);
+        test_time_1 := timeit.measure(function_name, input_values, executions);
+        overhead_time_1 := timeit.overhead(executions);
 
-        test_time_2 := pit.measure(function_name, input_values, executions);
-        overhead_time_2 := pit.overhead(executions);
+        test_time_2 := timeit.measure(function_name, input_values, executions);
+        overhead_time_2 := timeit.overhead(executions);
 
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
 
         if
-            pit.round_to_sig_figs(net_time_1, significant_figures)
+            timeit.round_to_sig_figs(net_time_1, significant_figures)
             =
-            pit.round_to_sig_figs(net_time_2, significant_figures)
+            timeit.round_to_sig_figs(net_time_2, significant_figures)
         then
 
-            final_result := pit.round_to_sig_figs(
+            final_result := timeit.round_to_sig_figs(
                 (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                 significant_figures
             );
@@ -69,7 +69,7 @@ begin
 
         else
 
-            raise notice '% (% executions)', pit.pretty_time(pit.round_to_sig_figs(
+            raise notice '% (% executions)', timeit.pretty_time(timeit.round_to_sig_figs(
                 (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
                 significant_figures
             )), executions;
@@ -82,7 +82,7 @@ begin
             extract(epoch from timeout) * 1e6
         then
 
-            executions := pit.min_executions(function_name, input_values, min_time);
+            executions := timeit.min_executions(function_name, input_values, min_time);
             if remaining_attempts = 0 then
                 remaining_attempts := attempts;
                 significant_figures := significant_figures - 1;

@@ -1,4 +1,4 @@
-CREATE TABLE pit.test_params (
+CREATE TABLE timeit.test_params (
     id bigint NOT NULL,
     input_values text[] NOT NULL,
     function_name text NOT NULL,
@@ -8,6 +8,6 @@ CREATE TABLE pit.test_params (
     return_value text,
     timeout interval,
     PRIMARY KEY (id),
-    FOREIGN KEY (id) REFERENCES pit.tests(id),
+    FOREIGN KEY (id) REFERENCES timeit.tests(id),
     CHECK (attempts >= 1)
 );

@@ -1,37 +1,37 @@
-<h1 id="top">⏱️🐘<code>pit</code></h1>
+<h1 id="top">⏱️🐘<code>timeit</code></h1>
 
 1. [About](#about)
 2. [Dependencies](#dependencies)
 3. [Installation](#installation)
 4. [Usage](#usage)
 5. [API](#api)
-    1. [pit.s()]
-    2. [pit.h()]
-    3. [pit.async()]
-    4. [pit.work()]
+    1. [timeit.s()]
+    2. [timeit.h()]
+    3. [timeit.async()]
+    4. [timeit.work()]
 6. [Internal types](#internal-types)
     1. [test_state]
 7. [Internal functions](#internal-functions)
-    1. [pit.round_to_sig_figs()]
-    2. [pit.measure()]
-    3. [pit.overhead()]
-    4. [pit.eval()]
+    1. [timeit.round_to_sig_figs()]
+    2. [timeit.measure()]
+    3. [timeit.overhead()]
+    4. [timeit.eval()]
 8. [Examples](#examples)
 
-[pit.s()]: #pit-s
-[pit.h()]: #pit-h
-[pit.async()]: #pit-async
-[pit.work()]: #pit-work
+[timeit.s()]: #timeit-s
+[timeit.h()]: #timeit-h
+[timeit.async()]: #timeit-async
+[timeit.work()]: #timeit-work
 [test_state]: #test-state
-[pit.round_to_sig_figs()]: #pit-round-to-sig-figs
-[pit.measure()]: #pit-measure
-[pit.overhead()]: #pit-overhead
-[pit.eval()]: #pit-eval
+[timeit.round_to_sig_figs()]: #timeit-round-to-sig-figs
+[timeit.measure()]: #timeit-measure
+[timeit.overhead()]: #timeit-overhead
+[timeit.eval()]: #timeit-eval
 
 <h2 id="about">1. About</h2>
 
-`pit` (short for **p**g-time**it**) is a [PostgreSQL] extension to measure
-the execution time of built-in internal C-functions with **nanosecond resolution**.
+`timeit` is a [PostgreSQL] extension to measure the execution time of built-in internal
+C-functions with high resolution.
 The high accurancy is achived by also adjusting for the overhead of the measurement itself.
 The number of necessary test iterations/executions are auto-detected and
 increased until the final result has the desired number of signifiant figures.
@@ -39,39 +39,39 @@ increased until the final result has the desired number of signifiant figures.
 To minimize noise, the executions and measurements are performed in C,
 as measuring using PL/pgSQL would be too noisy.
 
-`pit.s()` and `pit.h()` immediately measures the execution time for given
+`timeit.s()` and `timeit.h()` immediately measures the execution time for given
 internal function. These are suitable when you simply want to do a
 single measurement.
 
-`pit.s()` returns the execution time in seconds as a numeric value.
-`pit.h()` returns the execution time as a human-readable text value,
+`timeit.s()` returns the execution time in seconds as a numeric value.
+`timeit.h()` returns the execution time as a human-readable text value,
 e.g. "100 ms".
 
 The below example measures the execution time to compute the square root for
 the `numeric` value `2`, and returns the result in nanoseconds.
 
 ```sql
-CREATE EXTENSION pit;
+CREATE EXTENSION timeit;
 
-SELECT pit.h('clock_timestamp');
+SELECT timeit.h('clock_timestamp');
    h
 -------
  30 ns
 (1 row)
 
-SELECT pit.h('numeric_sqrt','{2}');
+SELECT timeit.h('numeric_sqrt','{2}');
    h
 --------
  300 ns
 (1 row)
 
-SELECT pit.h('numeric_sqrt','{2e131071}');
+SELECT timeit.h('numeric_sqrt','{2e131071}');
    h
 -------
  30 ms
 (1 row)
 
-SELECT pit.s('numeric_sqrt','{2e131071}');
+SELECT timeit.s('numeric_sqrt','{2e131071}');
   s
 ------
  0.03
@@ -83,27 +83,27 @@ Another simple example where we measure `pg_sleep(1)` with three
 `significant_figures`.
 
 ```sql
-CREATE EXTENSION pit;
+CREATE EXTENSION timeit;
 
-SELECT pit.h('pg_sleep','{1}', 3);
+SELECT timeit.h('pg_sleep','{1}', 3);
    h
 --------
  1.00 s
 (1 row)
 ```
 
-`pit.async()` defers the measurement and just returns an `id`, that the
+`timeit.async()` defers the measurement and just returns an `id`, that the
 caller can keep to allow the `final_result` to be joined in later
-when the execution time has been computed by the `pit.work()` `PROCEDURE`.
+when the execution time has been computed by the `timeit.work()` `PROCEDURE`.
 
-`pit.async()` is meant to be used when you have lots of functions/argument
+`timeit.async()` is meant to be used when you have lots of functions/argument
 combinations you want to measure, and have some query or program to
 generates those combinations for you, and you want to request all those
 values to be measured, without having to do the actual measurement
 immediately.
 
 ```sql
-SELECT pit.async('numeric_sqrt',ARRAY[format('2e%s',unnest)])
+SELECT timeit.async('numeric_sqrt',ARRAY[format('2e%s',unnest)])
 FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
 
  async
@@ -118,11 +118,11 @@ FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
 (7 rows)
 
 --
--- pit.work() can be executed manually like in this example,
--- or, run in the background by adding pg-pit-worker.sh
+-- timeit.work() can be executed manually like in this example,
+-- or, run in the background by adding pg-timeit-worker.sh
 -- to e.g. launchd or systemd, see Installation section.
 --
-CALL pit.work(return_when_idle := true);
+CALL timeit.work(return_when_idle := true);
 NOTICE:  2023-01-27 22:05:17+01 working
 NOTICE:  2023-01-27 22:05:17+01 7 in queue
 NOTICE:  2023-01-27 22:05:17+01 7 in queue
@@ -149,8 +149,8 @@ SELECT
     test_params.input_values,
     tests.executions,
     tests.final_result
-FROM pit.tests
-JOIN pit.test_params USING (id)
+FROM timeit.tests
+JOIN timeit.test_params USING (id)
 ORDER BY id;
 
  id | function_name | input_values | executions | final_result
@@ -166,10 +166,10 @@ ORDER BY id;
 
 ```
 
-Another nice thing with `pit.async()` and `pit.work()` is that they
+Another nice thing with `timeit.async()` and `timeit.work()` is that they
 spread out the actual measurements over time, by first doing one measurement,
 and then instead of immediately proceeding an doing a second measurement
-of the same thing, `pit.work()` will instead store the first measurement,
+of the same thing, `timeit.work()` will instead store the first measurement,
 and then proceed to do other measurements, and only in the next cycle
 proceed and do the second measurement, after which both measurements are
 compared to see if a result can be produced, or if the number of executions
@@ -187,7 +187,7 @@ None.
 
 <h2 id="installation">3. Installation</h2>
 
-Install the `pit` extension with:
+Install the `timeit` extension with:
 
     $ git clone https://github.com/joelonsql/pg-timeit.git
     $ cd pg-timeit
@@ -195,31 +195,31 @@ Install the `pit` extension with:
     $ sudo make install
     $ make installcheck
 
-Optionally, if you need `pit.async()`, you also need to schedule
-the `pit.work()` procedure to run in the background.
+Optionally, if you need `timeit.async()`, you also need to schedule
+the `timeit.work()` procedure to run in the background.
 
 Here is how to do that on Ubuntu Linux:
 
-    $ sudo cp pit-worker.sh /usr/local/bin/
-    $ sudo cp pit.service /etc/systemd/system/
-    $ sudo systemctl enable pit
-    $ sudo systemctl start pit
+    $ sudo cp timeit-worker.sh /usr/local/bin/
+    $ sudo cp timeit.service /etc/systemd/system/
+    $ sudo systemctl enable timeit
+    $ sudo systemctl start timeit
 
 Here is how to do that on Mac OS X:
 
-    $ ./add-pit-worker-to-launchd.sh
+    $ ./add-timeit-worker-to-launchd.sh
 
 <h2 id="usage">4. Usage</h2>
 
 Use with:
 
     $ psql
-    # CREATE EXTENSION pit;
+    # CREATE EXTENSION timeit;
     CREATE EXTENSION;
 
 <h2 id="api">5. API</h2>
 
-<h3 id="pit-s"><code>pit.s(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → numeric</code></h3>
+<h3 id="timeit-s"><code>timeit.s(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → numeric</code></h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
@@ -243,11 +243,11 @@ After `attempts` timeouts, the `significant_figures` will be decreased by one an
 
 When there are no more attempts and when sig. figures. can't be decreased further, it will give up.
 
-<h3 id="pit-h"><code>pit.h(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → text</code></h3>
+<h3 id="timeit-h"><code>timeit.h(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → text</code></h3>
 
-Like `pit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
+Like `timeit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
 
-<h3 id="pit-async"><code>pit.async(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → bigint</code></h3>
+<h3 id="timeit-async"><code>timeit.async(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → bigint</code></h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
@@ -259,11 +259,11 @@ Like `pit.s()`, but returns result a time unit pretty formatted text string, e.g
 
 Request measurement of the execution run time of `function_name`.
 
-Returns a bigint `id` value that is the primary key in the `pit.tests` table where the requested test is stored to.
+Returns a bigint `id` value that is the primary key in the `timeit.tests` table where the requested test is stored to.
 
-<h3 id="pit-now"><code>pit.work()</code></h3>
+<h3 id="timeit-now"><code>timeit.work()</code></h3>
 
-This procedure performs the measurements requested by `pit.async()` and is supposed to be called in a loop from a script or cronjob.
+This procedure performs the measurements requested by `timeit.async()` and is supposed to be called in a loop from a script or cronjob.
 
 See the [Installation](#installation) section for how to daemonize it.
 
@@ -271,7 +271,7 @@ See the [Installation](#installation) section for how to daemonize it.
 
 <h3 id="test-state"><code>test_state</code></h3>
 
-`pit.test_state` is an `ENUM` with the following elements:
+`timeit.test_state` is an `ENUM` with the following elements:
 
 - **init**: Test has just been initiated.
 - **run_test_1**: First test should be executed.
@@ -280,24 +280,24 @@ See the [Installation](#installation) section for how to daemonize it.
 
 <h2 id="internal-functions">7. Internal functions</h2>
 
-<h3 id="pit-round-to-sig-figs"><code>pit.round_to_sig_figs(numeric, integer) → numeric</code></h3>
+<h3 id="timeit-round-to-sig-figs"><code>timeit.round_to_sig_figs(numeric, integer) → numeric</code></h3>
 
 Round `numeric` value to `integer` number of significant figures.
 
 ```sql
-SELECT pit.round_to_sig_figs(1234,2);
+SELECT timeit.round_to_sig_figs(1234,2);
  round_to_sig_figs
 -------------------
               1200
 (1 row)
 
-SELECT pit.round_to_sig_figs(12.456,3);
+SELECT timeit.round_to_sig_figs(12.456,3);
  round_to_sig_figs
 -------------------
               12.5
 (1 row)
 
-SELECT pit.round_to_sig_figs(0.00012456,3);
+SELECT timeit.round_to_sig_figs(0.00012456,3);
  round_to_sig_figs
 -------------------
           0.000125
@@ -305,11 +305,11 @@ SELECT pit.round_to_sig_figs(0.00012456,3);
 
 ```
 
-<h3 id="pit-measure"><code>pit.measure(function_name text, input_values text[], executions bigint) -> numeric</code></h3>
+<h3 id="timeit-measure"><code>timeit.measure(function_name text, input_values text[], executions bigint) -> numeric</code></h3>
 
 Performs `executions` number of executions of `function_name` with arguments passed via `input_values`.
 
-<h3 id="pit-eval"><code>pit.eval(function_name text, input_values text[]) -> text</code></h3>
+<h3 id="timeit-eval"><code>timeit.eval(function_name text, input_values text[]) -> text</code></h3>
 
 Performs a single execution of `function_name` with arguments passed via `input_values`.
 
@@ -344,7 +344,7 @@ SELECT numeric_add(1.5, 2.5);
 To measure it:
 
 ```sql
-SELECT pit.h('numeric_add', ARRAY['1.5','2.5']);
+SELECT timeit.h('numeric_add', ARRAY['1.5','2.5']);
    h
 -------
  60 ns
@@ -356,7 +356,7 @@ By default, a result with one significant figure is produced.
 If we instead want two significant figures:
 
 ```sql
-SELECT pit.h('numeric_add', ARRAY['1.5','2.5'], 2);
+SELECT timeit.h('numeric_add', ARRAY['1.5','2.5'], 2);
    h
 -------
  24 ns
@@ -390,10 +390,10 @@ let's convert them to seconds to allow visual comparison:
 ```
 0.000024    <-- EXPLAIN ANALYZE "Exeuction Time"
 0.000909    <-- \timing
-0.000000024 <-- pit.h()
+0.000000024 <-- timeit.h()
 ```
 
-But how do we know the claimed exeuction time by `pit.h()` is reasonable?
+But how do we know the claimed exeuction time by `timeit.h()` is reasonable?
 
 Let's demonstrate how we can verify it manually, only standard PostgreSQL
 and its existing system catalog functions.
@@ -439,7 +439,7 @@ Time: 11688.894 ms (00:11.689)
 ```
 
 If we now instead invoke our volatile version of it, we will notice how it
-takes about 3 seconds longer time, which nicely matches the `pit.h()`
+takes about 3 seconds longer time, which nicely matches the `timeit.h()`
 returned result:
 
 ```sql
@@ -460,7 +460,7 @@ SELECT 14.525-11.344;
 
 Note how `3.181 s` is quite close to the predicted time `2.4 s`.
 
-Under the hood, `pit` measures the execution time by executing the function
+Under the hood, `timeit` measures the execution time by executing the function
 using C, and doesn't use `generate_series()` at all. This was only meant to
-demonstrate how users could verify the correctness of the pit measurements,
+demonstrate how users could verify the correctness of the timeit measurements,
 using tools available in standard PostgreSQL.
