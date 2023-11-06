@@ -54,19 +54,17 @@ begin
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
 
+        final_result := timeit.round_to_sig_figs(
+            (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
+            significant_figures
+        );
+
         if
             timeit.round_to_sig_figs(net_time_1, significant_figures)
             =
             timeit.round_to_sig_figs(net_time_2, significant_figures)
         then
-
-            final_result := timeit.round_to_sig_figs(
-                (net_time_1 + net_time_2)::numeric / (2 * executions * 1e6)::numeric,
-                significant_figures
-            );
-
             return final_result;
-
         else
 
             raise notice '% (% executions)', timeit.pretty_time(timeit.round_to_sig_figs(
@@ -87,8 +85,8 @@ begin
                 remaining_attempts := attempts;
                 significant_figures := significant_figures - 1;
                 if significant_figures < 1 then
-                    raise notice 'timeout, unable to produce result';
-                    return null;
+                    raise notice 'timeout, returning final_result anyway';
+                    return final_result;
                 end if;
                 raise notice 'timeout, will try significant_figures %', significant_figures;
             else
