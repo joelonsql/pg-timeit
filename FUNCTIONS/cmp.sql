@@ -4,6 +4,8 @@
 CREATE OR REPLACE FUNCTION timeit.cmp(
     OUT execution_time_a numeric,
     OUT execution_time_b numeric,
+    OUT total_time_a numeric,
+    OUT total_time_b numeric,
     OUT executions bigint,
     function_name_a text,
     function_name_b text,
@@ -27,10 +29,10 @@ declare
     overhead_time_a_2 bigint;
     overhead_time_b_1 bigint;
     overhead_time_b_2 bigint;
-    net_time_a_1 bigint;
-    net_time_a_2 bigint;
-    net_time_b_1 bigint;
-    net_time_b_2 bigint;
+    total_time_a_1 bigint;
+    total_time_a_2 bigint;
+    total_time_b_1 bigint;
+    total_time_b_2 bigint;
     execution_time_a_1 numeric;
     execution_time_a_2 numeric;
     execution_time_b_1 numeric;
@@ -71,22 +73,25 @@ begin
         test_time_b_2 := timeit.measure(function_name_b, input_values_b, executions);
         overhead_time_b_2 := timeit.overhead(executions);
 
-        net_time_a_1 := test_time_a_1 - overhead_time_a_1;
-        net_time_b_1 := test_time_b_1 - overhead_time_b_1;
-        net_time_a_2 := test_time_a_2 - overhead_time_a_2;
-        net_time_b_2 := test_time_b_2 - overhead_time_b_2;
+        total_time_a_1 := test_time_a_1 - overhead_time_a_1;
+        total_time_b_1 := test_time_b_1 - overhead_time_b_1;
+        total_time_a_2 := test_time_a_2 - overhead_time_a_2;
+        total_time_b_2 := test_time_b_2 - overhead_time_b_2;
 
-        execution_time_a_1 := timeit.round_to_sig_figs(net_time_a_1::numeric / (executions * 1e6)::numeric, significant_figures);
-        execution_time_b_1 := timeit.round_to_sig_figs(net_time_b_1::numeric / (executions * 1e6)::numeric, significant_figures);
-        execution_time_a_2 := timeit.round_to_sig_figs(net_time_a_2::numeric / (executions * 1e6)::numeric, significant_figures);
-        execution_time_b_2 := timeit.round_to_sig_figs(net_time_b_2::numeric / (executions * 1e6)::numeric, significant_figures);
+        total_time_a := (total_time_a_1 + total_time_a_2) / 2;
+        total_time_b := (total_time_b_1 + total_time_b_2) / 2;
+
+        execution_time_a_1 := timeit.round_to_sig_figs(total_time_a_1::numeric / (executions * 1e6)::numeric, significant_figures);
+        execution_time_b_1 := timeit.round_to_sig_figs(total_time_b_1::numeric / (executions * 1e6)::numeric, significant_figures);
+        execution_time_a_2 := timeit.round_to_sig_figs(total_time_a_2::numeric / (executions * 1e6)::numeric, significant_figures);
+        execution_time_b_2 := timeit.round_to_sig_figs(total_time_b_2::numeric / (executions * 1e6)::numeric, significant_figures);
 
         execution_time_a := timeit.round_to_sig_figs(
-            (net_time_a_1 + net_time_a_2)::numeric / (2 * executions * 1e6)::numeric,
+            (total_time_a_1 + total_time_a_2)::numeric / (2 * executions * 1e6)::numeric,
             significant_figures
         );
         execution_time_b := timeit.round_to_sig_figs(
-            (net_time_b_1 + net_time_b_2)::numeric / (2 * executions * 1e6)::numeric,
+            (total_time_b_1 + total_time_b_2)::numeric / (2 * executions * 1e6)::numeric,
             significant_figures
         );
 
@@ -107,7 +112,7 @@ begin
         end if;
 
         if
-            least(net_time_a_1,net_time_a_2,net_time_b_1,net_time_b_2) * 2
+            least(total_time_a_1,total_time_a_2,total_time_b_1,total_time_b_2) * 2
             >
             extract(epoch from timeout) * 1e6
         then
