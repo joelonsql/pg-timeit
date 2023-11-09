@@ -99,12 +99,17 @@ begin
             t_b_1,
             t_b_2;
 
-        -- Return anyway if we're near timeout.
+        -- Return if we're near timeout.
         if
             least(total_time_a_1,total_time_a_2,total_time_b_1,total_time_b_2) * 2
             >
             extract(epoch from timeout) * 1e6
         then
+            execution_time_a := NULL;
+            execution_time_b := NULL;
+            total_time_a := NULL;
+            total_time_b := NULL;
+            executions := NULL;
             return;
         end if;
 
