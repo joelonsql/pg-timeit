@@ -47,8 +47,8 @@ begin
         total_time_a_2 := test_time_a_2 - overhead_time;
         total_time_b_2 := test_time_b_2 - overhead_time;
 
-        total_time_a := (total_time_a_1 + total_time_a_2);
-        total_time_b := (total_time_b_1 + total_time_b_2);
+        total_time_a := (total_time_a_1 + total_time_a_2) / 2;
+        total_time_b := (total_time_b_1 + total_time_b_2) / 2;
 
         if least(total_time_a_1,total_time_a_2) > 0
         and least(total_time_b_1,total_time_b_2) > 0
@@ -56,7 +56,6 @@ begin
             or least(total_time_a_1,total_time_a_2) > greatest(total_time_b_1,total_time_b_2)
             or clock_timestamp()-t0 > timeout)
         then
-            executions := executions * 4;
             return;
         else
             executions := executions * 2;
