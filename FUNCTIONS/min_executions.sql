@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION timeit.min_executions(
     function_name text,
     input_values text[],
-    min_time interval
+    significant_figures int
 )
 RETURNS bigint
 LANGUAGE plpgsql
@@ -9,12 +9,8 @@ AS $$
 declare
     test_time bigint;
     executions bigint := 1;
-    min_t bigint := extract(epoch from min_time) * 1e6;
+    min_t bigint := 10^significant_figures;
 begin
-
-    if min_time is null then
-        return executions;
-    end if;
 
     loop
 
