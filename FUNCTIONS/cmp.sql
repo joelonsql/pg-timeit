@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION timeit.cmp(
     input_values_a text[] DEFAULT ARRAY[]::text[],
     input_values_b text[] DEFAULT ARRAY[]::text[],
     timeout interval DEFAULT '1 ms'::interval,
+    min_time bigint DEFAULT 100,
     INOUT executions bigint DEFAULT 1,
     OUT total_time_a numeric,
     OUT total_time_b numeric
@@ -55,6 +56,7 @@ begin
         and (greatest(total_time_a_1,total_time_a_2) < least(total_time_b_1,total_time_b_2)
             or least(total_time_a_1,total_time_a_2) > greatest(total_time_b_1,total_time_b_2)
             or clock_timestamp()-t0 > timeout)
+        and least(total_time_a_1,total_time_a_2,total_time_b_1,total_time_b_2) > min_time
         then
             return;
         else
