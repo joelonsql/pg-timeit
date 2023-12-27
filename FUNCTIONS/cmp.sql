@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION timeit.cmp(
     input_values_b text[] DEFAULT ARRAY[]::text[],
     timeout interval DEFAULT '1 ms'::interval,
     min_time bigint DEFAULT 100,
+    significant_figures integer DEFAULT 0,
     INOUT executions bigint DEFAULT 1,
     OUT total_time_a numeric,
     OUT total_time_b numeric
@@ -57,6 +58,9 @@ begin
             or least(total_time_a_1,total_time_a_2) > greatest(total_time_b_1,total_time_b_2)
             or clock_timestamp()-t0 > timeout)
         and least(total_time_a_1,total_time_a_2,total_time_b_1,total_time_b_2) > min_time
+        and timeit.round_to_sig_figs(total_time_a_1::numeric / test_time_b_1::numeric, significant_figures)
+            =
+            timeit.round_to_sig_figs(test_time_a_2::numeric / test_time_b_2::numeric, significant_figures)
         then
             return;
         else
