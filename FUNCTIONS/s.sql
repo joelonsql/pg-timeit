@@ -11,10 +11,10 @@ CREATE OR REPLACE FUNCTION timeit.s(
     min_time interval DEFAULT '10 ms'::interval
 )
 RETURNS numeric
-LANGUAGE SQL
-BEGIN ATOMIC
+LANGUAGE sql
+AS $$
     SELECT timeit.round_to_sig_figs(
         timeit.f($1,$2,$3,$4,$5,$6)::numeric,
         $3
     );
-END;
+$$;
