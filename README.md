@@ -7,8 +7,9 @@
 5. [API](#api)
     1. [timeit.s()]
     2. [timeit.h()]
-    3. [timeit.async()]
-    4. [timeit.work()]
+    3. [timeit.f()]
+    4. [timeit.async()]
+    5. [timeit.work()]
 6. [Internal types](#internal-types)
     1. [test_state]
 7. [Internal functions](#internal-functions)
@@ -20,6 +21,7 @@
 
 [timeit.s()]: #timeit-s
 [timeit.h()]: #timeit-h
+[timeit.f()]: #timeit-f
 [timeit.async()]: #timeit-async
 [timeit.work()]: #timeit-work
 [test_state]: #test-state
@@ -219,7 +221,7 @@ Use with:
 
 <h2 id="api">5. API</h2>
 
-<h3 id="timeit-s"><code>timeit.s(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → numeric</code></h3>
+<h3 id="timeit-s"><code>timeit.s(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → numeric</code></h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
@@ -228,6 +230,7 @@ Use with:
  significant_figures  | integer  | 1
  timeout              | interval | NULL
  attempts             | integer  | 1
+ min_time             | interval | 10 ms
 
 Immediately measure the execution run time of the built-in internal function named `function_name`.
 
@@ -243,11 +246,15 @@ After `attempts` timeouts, the `significant_figures` will be decreased by one an
 
 When there are no more attempts and when sig. figures. can't be decreased further, it will give up.
 
-<h3 id="timeit-h"><code>timeit.h(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → text</code></h3>
+<h3 id="timeit-h"><code>timeit.h(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → text</code></h3>
 
 Like `timeit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
 
-<h3 id="timeit-async"><code>timeit.async(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts]) → bigint</code></h3>
+<h3 id="timeit-f"><code>timeit.f(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → float8</code></h3>
+
+Like `timeit.s()`, but returns the result as a float8 without rounding to significant figures.
+
+<h3 id="timeit-async"><code>timeit.async(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → bigint</code></h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
@@ -256,6 +263,7 @@ Like `timeit.s()`, but returns result a time unit pretty formatted text string, 
  significant_figures  | integer  | 1
  timeout              | interval | NULL
  attempts             | integer  | 1
+ min_time             | interval | 10 ms
 
 Request measurement of the execution run time of `function_name`.
 
