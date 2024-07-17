@@ -21,6 +21,7 @@ SQL_SRC = \
 	TYPES/test_state.sql \
 	TABLES/tests.sql \
 	TABLES/test_params.sql \
+	FUNCTIONS/trim_scale.sql \
 	FUNCTIONS/round_to_sig_figs.sql \
 	FUNCTIONS/measure.sql \
 	FUNCTIONS/min_executions.sql \
