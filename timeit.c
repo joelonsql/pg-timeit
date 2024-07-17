@@ -6,25 +6,17 @@
 #include "utils/timestamp.h"
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
-
-#ifdef __has_include
-#if __has_include(<sched.h>)
 #include <sched.h>
-#define HAVE_SCHED_H 1
-#endif
-#endif
-
-#ifdef HAVE_SCHED_H
-#if defined(_GNU_SOURCE) && defined(__sched_setaffinity)
-#define HAVE_SCHED_SETAFFINITY 1
-#endif
-#endif
 #include <unistd.h>
 
 PG_MODULE_MAGIC;
 
 #ifndef TEXTOID
 #define TEXTOID 25
+#endif
+
+#if defined(sched_setaffinity)
+#define HAVE_SCHED_SETAFFINITY 1
 #endif
 
 #ifdef HAVE_SCHED_SETAFFINITY
