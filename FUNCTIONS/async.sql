@@ -4,7 +4,8 @@ CREATE OR REPLACE FUNCTION timeit.async(
     significant_figures integer DEFAULT 1,
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
-    min_time interval DEFAULT '10 ms'::interval
+    min_time interval DEFAULT '10 ms'::interval,
+    core_id integer DEFAULT -1
 )
 RETURNS bigint
 LANGUAGE plpgsql
@@ -26,9 +27,9 @@ begin
     RETURNING tests.id INTO id;
 
     INSERT INTO timeit.test_params
-        (id, function_name, input_values, significant_figures, timeout, attempts, min_time)
+        (id, function_name, input_values, significant_figures, timeout, attempts, min_time, core_id)
     VALUES
-        (id, function_name, input_values, significant_figures, timeout, attempts, min_time);
+        (id, function_name, input_values, significant_figures, timeout, attempts, min_time, core_id);
 
     return id;
 

@@ -8,7 +8,8 @@ CREATE OR REPLACE FUNCTION timeit.f(
     significant_figures integer DEFAULT 1,
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
-    min_time interval DEFAULT '10 ms'::interval
+    min_time interval DEFAULT '10 ms'::interval,
+    core_id integer DEFAULT -1
 )
 RETURNS float8
 LANGUAGE plpgsql
@@ -40,17 +41,17 @@ begin
         raise exception 'timeout must be larger than at least twice the min_time';
     end if;
 
-    executions := timeit.min_executions(function_name, input_values, min_time);
+    executions := timeit.min_executions(function_name, input_values, min_time, core_id);
 
     remaining_attempts := attempts;
 
     loop
 
-        test_time_1 := timeit.measure(function_name, input_values, executions);
-        overhead_time_1 := timeit.overhead(executions);
+        test_time_1 := timeit.measure(function_name, input_values, executions, core_id);
+        overhead_time_1 := timeit.overhead(executions, core_id);
 
-        test_time_2 := timeit.measure(function_name, input_values, executions);
-        overhead_time_2 := timeit.overhead(executions);
+        test_time_2 := timeit.measure(function_name, input_values, executions, core_id);
+        overhead_time_2 := timeit.overhead(executions, core_id);
 
         net_time_1 := test_time_1 - overhead_time_1;
         net_time_2 := test_time_2 - overhead_time_2;
@@ -78,7 +79,7 @@ begin
             extract(epoch from timeout) * 1e6
         then
 
-            executions := timeit.min_executions(function_name, input_values, min_time);
+            executions := timeit.min_executions(function_name, input_values, min_time, core_id);
             if remaining_attempts = 0 then
                 remaining_attempts := attempts;
                 significant_figures := significant_figures - 1;

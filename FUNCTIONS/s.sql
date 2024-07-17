@@ -8,13 +8,14 @@ CREATE OR REPLACE FUNCTION timeit.s(
     significant_figures integer DEFAULT 1,
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
-    min_time interval DEFAULT '10 ms'::interval
+    min_time interval DEFAULT '10 ms'::interval,
+    core_id integer DEFAULT -1
 )
 RETURNS numeric
 LANGUAGE sql
 AS $$
     SELECT timeit.round_to_sig_figs(
-        timeit.f($1,$2,$3,$4,$5,$6)::numeric,
+        timeit.f($1,$2,$3,$4,$5,$6,$7)::numeric,
         $3
     );
 $$;

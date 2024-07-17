@@ -7,7 +7,30 @@
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
 
+#ifdef HAVE_SCHED_H
+#include <sched.h>
+#endif
+
+#include <unistd.h>
+
 PG_MODULE_MAGIC;
+
+#ifdef HAVE_SCHED_H
+static void
+set_cpu_affinity(int core_id) {
+    cpu_set_t cpuset;
+    pid_t pid;
+
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    pid = getpid();
+    if (sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset) != 0) {
+        perror("sched_setaffinity");
+        exit(EXIT_FAILURE);
+    }
+}
+#endif
 
 /*
  * Helper-function for the two SQL functions timeit.measure() and timeit.eval().
@@ -16,7 +39,7 @@ PG_MODULE_MAGIC;
  * It will then execute the specified internal function once with the
  * input values, and return the result as a text Datum.
  *
- * When called by timeit.measure(), all three argumnents are specified.
+ * When called by timeit.measure(), all three arguments are specified.
  * It will then execute the specified internal function as many times as
  * specified, and return the measured time in microseconds as a int64 Datum.
  */
@@ -29,6 +52,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
     text        *internal_function_name = PG_GETARG_TEXT_P(0);
     ArrayType   *input_values           = PG_GETARG_ARRAYTYPE_P(1);
     int64       number_of_executions    = (PG_NARGS() == 2) ? 1 : PG_GETARG_INT64(2);
+    int         core_id                 = (PG_NARGS() == 2) ? -1 : PG_GETARG_INT32(3);
 
     char                *internal_function_name_c_string;
     Datum               *values;
@@ -142,6 +166,16 @@ measure_or_eval(PG_FUNCTION_ARGS)
              internal_function_name_c_string);
     }
 
+    if (core_id != -1)
+    {
+        #ifdef HAVE_SCHED_H
+        /* Set CPU affinity to the specified core */
+        set_cpu_affinity(core_id);
+        #else
+        elog(ERROR, "Setting CPU core id supported on this architecture");
+        #endif
+    }
+
     /* Start measuring execution time. */
     start_time = GetCurrentTimestamp();
 
@@ -198,10 +232,21 @@ PG_FUNCTION_INFO_V1(overhead);
 Datum
 overhead(PG_FUNCTION_ARGS)
 {
-    int64 number_of_iterations = PG_GETARG_INT64(0);
+    int64   number_of_iterations    = PG_GETARG_INT64(0);
+    int     core_id                 = PG_GETARG_INT32(1);
     TimestampTz start_time;
     TimestampTz end_time;
     int64 total_time;
+
+    if (core_id != -1)
+    {
+        #ifdef HAVE_SCHED_H
+        /* Set CPU affinity to the specified core */
+        set_cpu_affinity(core_id);
+        #else
+        elog(ERROR, "Setting CPU core id supported on this architecture");
+        #endif
+    }
 
     /* Start measuring execution time */
     start_time = GetCurrentTimestamp();

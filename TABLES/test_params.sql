@@ -7,6 +7,7 @@ CREATE TABLE timeit.test_params (
     min_time interval NOT NULL,
     return_value text,
     timeout interval,
+    core_id integer,
     PRIMARY KEY (id),
     FOREIGN KEY (id) REFERENCES timeit.tests(id),
     CHECK (attempts >= 1)

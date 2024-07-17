@@ -26,6 +26,7 @@ declare
     attempts integer;
     min_time interval;
     remaining_attempts integer;
+    core_id integer;
 begin
 
 loop
@@ -67,7 +68,8 @@ loop
         timeout,
         attempts,
         min_time,
-        remaining_attempts
+        remaining_attempts,
+        core_id
     in
         SELECT
             tests.id,
@@ -83,7 +85,8 @@ loop
             test_params.timeout,
             test_params.attempts,
             test_params.min_time,
-            tests.remaining_attempts
+            tests.remaining_attempts,
+            test_params.core_id
         FROM timeit.tests
         JOIN timeit.test_params ON test_params.id = tests.id
         WHERE tests.test_state <> 'final'
@@ -94,7 +97,7 @@ loop
 
             if test_state = 'init' then
 
-                executions := timeit.min_executions(function_name, input_values, min_time);
+                executions := timeit.min_executions(function_name, input_values, min_time, core_id);
 
                 UPDATE timeit.tests SET
                     test_state = 'run_test_1',
@@ -111,12 +114,12 @@ loop
             elsif test_state = 'run_test_1' then
 
                 /* Warm-up two times with identical calls. */
-                test_time_1 := timeit.measure(function_name, input_values, executions);
-                test_time_1 := timeit.measure(function_name, input_values, executions);
+                test_time_1 := timeit.measure(function_name, input_values, executions, core_id);
+                test_time_1 := timeit.measure(function_name, input_values, executions, core_id);
                 /* Measure. */
-                test_time_1 := timeit.measure(function_name, input_values, executions);
+                test_time_1 := timeit.measure(function_name, input_values, executions, core_id);
 
-                overhead_time_1 := timeit.overhead(executions);
+                overhead_time_1 := timeit.overhead(executions, core_id);
 
                 UPDATE timeit.tests SET
                     test_state = 'run_test_2',
@@ -128,12 +131,12 @@ loop
             elsif test_state = 'run_test_2' then
 
                 /* Warm-up two times with identical calls. */
-                test_time_2 := timeit.measure(function_name, input_values, executions);
-                test_time_2 := timeit.measure(function_name, input_values, executions);
+                test_time_2 := timeit.measure(function_name, input_values, executions, core_id);
+                test_time_2 := timeit.measure(function_name, input_values, executions, core_id);
                 /* Measure. */
-                test_time_2 := timeit.measure(function_name, input_values, executions);
+                test_time_2 := timeit.measure(function_name, input_values, executions, core_id);
 
-                overhead_time_2 := timeit.overhead(executions);
+                overhead_time_2 := timeit.overhead(executions, core_id);
 
                 net_time_1 := test_time_1 - overhead_time_1;
                 net_time_2 := test_time_2 - overhead_time_2;

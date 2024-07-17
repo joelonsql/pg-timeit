@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION timeit.overhead(
-    executions bigint
+    executions bigint,
+    core_id int
 )
 RETURNS bigint
 LANGUAGE c

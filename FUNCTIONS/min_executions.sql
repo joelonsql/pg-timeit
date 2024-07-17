@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION timeit.min_executions(
     function_name text,
     input_values text[],
-    min_time interval
+    min_time interval,
+    core_id integer
 )
 RETURNS bigint
 LANGUAGE plpgsql
@@ -18,7 +19,7 @@ begin
 
     loop
 
-        test_time := timeit.measure(function_name, input_values, executions);
+        test_time := timeit.measure(function_name, input_values, executions, core_id);
 
         if test_time >= min_t then
             return executions;
