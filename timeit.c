@@ -15,6 +15,10 @@
 
 PG_MODULE_MAGIC;
 
+#ifndef TEXTOID
+#define TEXTOID 25
+#endif
+
 #ifdef HAVE_SCHED_H
 static void
 set_cpu_affinity(int core_id) {
@@ -41,7 +45,7 @@ set_cpu_affinity(int core_id) {
  *
  * When called by timeit.measure(), all three arguments are specified.
  * It will then execute the specified internal function as many times as
- * specified, and return the measured time in microseconds as a int64 Datum.
+ * specified, and return the measured time in microseconds as an int64 Datum.
  */
 
 PG_FUNCTION_INFO_V1(measure_or_eval);
