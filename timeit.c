@@ -7,10 +7,18 @@
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
 
-#ifdef HAVE_SCHED_H
+#ifdef __has_include
+#if __has_include(<sched.h>)
 #include <sched.h>
+#define HAVE_SCHED_H 1
+#endif
 #endif
 
+#ifdef HAVE_SCHED_H
+#if defined(_GNU_SOURCE) && defined(__sched_setaffinity)
+#define HAVE_SCHED_SETAFFINITY 1
+#endif
+#endif
 #include <unistd.h>
 
 PG_MODULE_MAGIC;
@@ -19,7 +27,7 @@ PG_MODULE_MAGIC;
 #define TEXTOID 25
 #endif
 
-#ifdef HAVE_SCHED_H
+#ifdef HAVE_SCHED_SETAFFINITY
 static void
 set_cpu_affinity(int core_id) {
     cpu_set_t cpuset;
@@ -172,7 +180,7 @@ measure_or_eval(PG_FUNCTION_ARGS)
 
     if (core_id != -1)
     {
-        #ifdef HAVE_SCHED_H
+        #ifdef HAVE_SCHED_SETAFFINITY
         /* Set CPU affinity to the specified core */
         set_cpu_affinity(core_id);
         #else
@@ -244,7 +252,7 @@ overhead(PG_FUNCTION_ARGS)
 
     if (core_id != -1)
     {
-        #ifdef HAVE_SCHED_H
+        #ifdef HAVE_SCHED_SETAFFINITY
         /* Set CPU affinity to the specified core */
         set_cpu_affinity(core_id);
         #else
