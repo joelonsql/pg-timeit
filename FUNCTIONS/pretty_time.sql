@@ -5,6 +5,7 @@
 CREATE OR REPLACE FUNCTION timeit.pretty_time(numeric)
 RETURNS text
 LANGUAGE sql
+SET search_path = timeit, public, pg_temp
 AS $$
 SELECT
     CASE

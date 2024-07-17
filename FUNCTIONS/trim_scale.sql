@@ -5,12 +5,12 @@ BEGIN
         SELECT 1
         FROM pg_proc
         WHERE proname = 'trim_scale'
-        AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+        AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'pg_catalog')
     ) THEN
         -- Create the 'trim_scale' function if it doesn't exist
         EXECUTE
         $_$
-            CREATE OR REPLACE FUNCTION trim_scale(numeric) RETURNS numeric AS
+            CREATE OR REPLACE FUNCTION timeit.trim_scale(numeric) RETURNS numeric AS
             $__$
                 DECLARE
                     trimmed numeric;
