@@ -40,7 +40,7 @@ CREATE OR REPLACE FUNCTION timeit.async(
     function_name text,
     significant_figures integer
 )
-RETURNS numeric
+RETURNS bigint
 LANGUAGE sql
 AS $$
 SELECT timeit.async($1,ARRAY[]::text[],$2);
