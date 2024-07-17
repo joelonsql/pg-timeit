@@ -15,7 +15,7 @@ PG_MODULE_MAGIC;
 #define TEXTOID 25
 #endif
 
-#if defined(sched_setaffinity)
+#ifdef CPU_SET
 #define HAVE_SCHED_SETAFFINITY 1
 #endif
 
