@@ -1,0 +1,6 @@
+SELECT timeit.t('numeric_sqrt', ARRAY['2']) IS NOT NULL;
+ ?column? 
+----------
+ t
+(1 row)
+

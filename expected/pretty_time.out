@@ -1,0 +1,90 @@
+SELECT timeit.pretty_time(124999,2);
+ pretty_time 
+-------------
+ 120000 s
+(1 row)
+
+SELECT timeit.pretty_time(124999,3);
+ pretty_time 
+-------------
+ 125000 s
+(1 row)
+
+SELECT timeit.pretty_time(0.000124999,2);
+ pretty_time 
+-------------
+ 120 µs
+(1 row)
+
+SELECT timeit.pretty_time(0.000124999,3);
+ pretty_time 
+-------------
+ 125 µs
+(1 row)
+
+SELECT timeit.pretty_time(1);
+ pretty_time 
+-------------
+ 1 s
+(1 row)
+
+SELECT timeit.pretty_time(0.1);
+ pretty_time 
+-------------
+ 100 ms
+(1 row)
+
+SELECT timeit.pretty_time(0.01);
+ pretty_time 
+-------------
+ 10 ms
+(1 row)
+
+SELECT timeit.pretty_time(0.001);
+ pretty_time 
+-------------
+ 1 ms
+(1 row)
+
+SELECT timeit.pretty_time(0.0001);
+ pretty_time 
+-------------
+ 100 µs
+(1 row)
+
+SELECT timeit.pretty_time(0.00001);
+ pretty_time 
+-------------
+ 10 µs
+(1 row)
+
+SELECT timeit.pretty_time(0.000001);
+ pretty_time 
+-------------
+ 1 µs
+(1 row)
+
+SELECT timeit.pretty_time(0.0000001);
+ pretty_time 
+-------------
+ 100 ns
+(1 row)
+
+SELECT timeit.pretty_time(0.00000001);
+ pretty_time 
+-------------
+ 10 ns
+(1 row)
+
+SELECT timeit.pretty_time(0.000000001);
+ pretty_time 
+-------------
+ 1 ns
+(1 row)
+
+SELECT timeit.pretty_time(0.0000000001);
+ pretty_time 
+-------------
+ 1e-10 s
+(1 row)
+

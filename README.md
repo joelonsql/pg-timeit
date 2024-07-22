@@ -5,187 +5,52 @@
 3. [Installation](#installation)
 4. [Usage](#usage)
 5. [API](#api)
-    1. [timeit.s()]
-    2. [timeit.h()]
-    3. [timeit.f()]
-    4. [timeit.async()]
-    5. [timeit.work()]
-6. [Internal types](#internal-types)
-    1. [test_state]
+    1. [timeit.c](#timeit-c)
+    2. [timeit.t](#timeit-t)
+    3. [timeit.measure](#timeit-measure)
+6. [Types](#types)
+    1. [timeit.measure_type](#measure-type)
 7. [Internal functions](#internal-functions)
-    1. [timeit.round_to_sig_figs()]
-    2. [timeit.measure()]
-    3. [timeit.overhead()]
-    4. [timeit.eval()]
+    1. [timeit.round_to_sig_figs](#timeit-round-to-sig-figs)
+    2. [timeit.compute_regression_metrics](#timeit-compute-regression-metrics)
+    3. [timeit.pretty_time](#timeit-pretty-time)
+    4. [timeit.measure_time](#timeit-measure-time)
+    5. [timeit.measure_cycles](#timeit-measure-cycles)
+    6. [timeit.eval](#timeit-eval)
 8. [Examples](#examples)
 
-[timeit.s()]: #timeit-s
-[timeit.h()]: #timeit-h
-[timeit.f()]: #timeit-f
-[timeit.async()]: #timeit-async
-[timeit.work()]: #timeit-work
-[test_state]: #test-state
-[timeit.round_to_sig_figs()]: #timeit-round-to-sig-figs
-[timeit.measure()]: #timeit-measure
-[timeit.overhead()]: #timeit-overhead
-[timeit.eval()]: #timeit-eval
+[timeit.c]: #timeit-c
+[timeit.t]: #timeit-t
+[timeit.measure]: #timeit-measure
+[timeit.measure_type]: #measure-type
+[timeit.round_to_sig_figs]: #timeit-round-to-sig-figs
+[timeit.compute_regression_metrics]: #timeit-compute-regression-metrics
+[timeit.pretty_time]: #timeit-pretty-time
+[timeit.measure_time]: #timeit-measure-time
+[timeit.measure_cycles]: #timeit-measure-cycles
+[timeit.eval]: #timeit-eval
 
 <h2 id="about">1. About</h2>
 
-`timeit` is a [PostgreSQL] extension to measure the execution time of built-in internal
-C-functions with high resolution.
-The high accurancy is achived by also adjusting for the overhead of the measurement itself.
-The number of necessary test iterations/executions are auto-detected and
-increased until the final result has the desired number of signifiant figures.
+`timeit` is a [PostgreSQL] extension to measure the execution time of built-in
+internal C-functions with high resolution. On x86_64, it's also possible to
+measure clock cycles.
 
-To minimize noise, the executions and measurements are performed in C,
-as measuring using PL/pgSQL would be too noisy.
+The number of necessary iterations to obtain a stable measurement is determined
+automatically, by starting with one iteration, and then doubling, until the
+latest measurements form a more or less straight line, using linear regression,
+controlled via the *r_squared_threshold* and *sample_size* parameters,
+or until reaching a *timeout*.
 
-`timeit.s()` and `timeit.h()` immediately measures the execution time for given
-internal function. These are suitable when you simply want to do a
-single measurement.
-
-`timeit.s()` returns the execution time in seconds as a numeric value.
-`timeit.h()` returns the execution time as a human-readable text value,
-e.g. "100 ms".
-
-The below example measures the execution time to compute the square root for
-the `numeric` value `2`, and returns the result in nanoseconds.
-
-```sql
-CREATE EXTENSION timeit;
-
-SELECT timeit.h('clock_timestamp');
-   h
--------
- 30 ns
-(1 row)
-
-SELECT timeit.h('numeric_sqrt','{2}');
-   h
---------
- 300 ns
-(1 row)
-
-SELECT timeit.h('numeric_sqrt','{2e131071}');
-   h
--------
- 30 ms
-(1 row)
-
-SELECT timeit.s('numeric_sqrt','{2e131071}');
-  s
-------
- 0.03
-(1 row)
-
-```
-
-Another simple example where we measure `pg_sleep(1)` with three
-`significant_figures`.
-
-```sql
-CREATE EXTENSION timeit;
-
-SELECT timeit.h('pg_sleep','{1}', 3);
-   h
---------
- 1.00 s
-(1 row)
-```
-
-`timeit.async()` defers the measurement and just returns an `id`, that the
-caller can keep to allow the `final_result` to be joined in later
-when the execution time has been computed by the `timeit.work()` `PROCEDURE`.
-
-`timeit.async()` is meant to be used when you have lots of functions/argument
-combinations you want to measure, and have some query or program to
-generates those combinations for you, and you want to request all those
-values to be measured, without having to do the actual measurement
-immediately.
-
-```sql
-SELECT timeit.async('numeric_sqrt',ARRAY[format('2e%s',unnest)])
-FROM unnest(ARRAY[0,10,100,1000,10000,100000,131071]);
-
- async
--------
-     1
-     2
-     3
-     4
-     5
-     6
-     7
-(7 rows)
-
---
--- timeit.work() can be executed manually like in this example,
--- or, run in the background by adding pg-timeit-worker.sh
--- to e.g. launchd or systemd, see Installation section.
---
-CALL timeit.work(return_when_idle := true);
-NOTICE:  2023-01-27 22:05:17+01 working
-NOTICE:  2023-01-27 22:05:17+01 7 in queue
-NOTICE:  2023-01-27 22:05:17+01 7 in queue
-NOTICE:  2023-01-27 22:05:17+01 7 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 3 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 2 in queue
-NOTICE:  2023-01-27 22:05:17+01 idle
-
-SELECT
-    tests.id,
-    test_params.function_name,
-    test_params.input_values,
-    tests.executions,
-    tests.final_result
-FROM timeit.tests
-JOIN timeit.test_params USING (id)
-ORDER BY id;
-
- id | function_name | input_values | executions | final_result
-----+---------------+--------------+------------+--------------
-  1 | numeric_sqrt  | {2e0}        |        128 |   0.00000009
-  2 | numeric_sqrt  | {2e10}       |        128 |   0.00000009
-  3 | numeric_sqrt  | {2e100}      |         16 |    0.0000007
-  4 | numeric_sqrt  | {2e1000}     |          1 |      0.00001
-  5 | numeric_sqrt  | {2e10000}    |          1 |       0.0002
-  6 | numeric_sqrt  | {2e100000}   |          1 |         0.02
-  7 | numeric_sqrt  | {2e131071}   |          1 |         0.03
-(7 rows)
-
-```
-
-Another nice thing with `timeit.async()` and `timeit.work()` is that they
-spread out the actual measurements over time, by first doing one measurement,
-and then instead of immediately proceeding an doing a second measurement
-of the same thing, `timeit.work()` will instead store the first measurement,
-and then proceed to do other measurements, and only in the next cycle
-proceed and do the second measurement, after which both measurements are
-compared to see if a result can be produced, or if the number of executions
-needs to be increased further.
-
-By separating the first and second measurement from each other in time,
-the risk is reduced that both would be similarily unusually slow,
-due to the CPU being similarily busy both times.
+This approach allows quickly measuring all types of functions, from just a few
+clock cycles up to functions that take seconds, while at the same time ensuring
+a stable measurement is obtained.
 
 [PostgreSQL]: https://www.postgresql.org/
 
 <h2 id="dependencies">2. Dependencies</h2>
 
-None.
+None, except [PostgreSQL].
 
 <h2 id="installation">3. Installation</h2>
 
@@ -197,20 +62,6 @@ Install the `timeit` extension with:
     $ sudo make install
     $ make installcheck
 
-Optionally, if you need `timeit.async()`, you also need to schedule
-the `timeit.work()` procedure to run in the background.
-
-Here is how to do that on Ubuntu Linux:
-
-    $ sudo cp timeit-worker.sh /usr/local/bin/
-    $ sudo cp timeit.service /etc/systemd/system/
-    $ sudo systemctl enable timeit
-    $ sudo systemctl start timeit
-
-Here is how to do that on Mac OS X:
-
-    $ ./add-timeit-worker-to-launchd.sh
-
 <h2 id="usage">4. Usage</h2>
 
 Use with:
@@ -221,74 +72,100 @@ Use with:
 
 <h2 id="api">5. API</h2>
 
-<h3 id="timeit-s"><code>timeit.s(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → numeric</code></h3>
+<h3 id="timeit-c">timeit.c → bigint</h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
- function_name        | text     |
- input_values         | text[]   | ARRAY[]::text[]
+ function_name        | text     | 
+ input_values         | text[]   | 
  significant_figures  | integer  | 1
- timeout              | interval | NULL
- attempts             | integer  | 1
- min_time             | interval | 10 ms
+ r_squared_threshold  | float8   | 0.99
+ sample_size          | integer  | 10
+ timeout              | interval | 1 second
+ core_id              | integer  | -1
 
-Immediately measure the execution run time of the built-in internal function named `function_name`.
+Returns measured clock cycles, rounded to significant figures.
 
-Returns the measured execution time in seconds.
-
-Optionally, arguments can be passed by specifying `input_values`.
-
-The desired precision of the returned final result can be specified via `significant_figures`, which defaults to 1.
-
-A maximum timeout interval per attempt can be specified via the `timeout` input parameter, which defaults to NULL, which means no timeout.
-
-After `attempts` timeouts, the `significant_figures` will be decreased by one and `attempts` new attempts will be made at that precision level.
-
-When there are no more attempts and when sig. figures. can't be decreased further, it will give up.
-
-<h3 id="timeit-h"><code>timeit.h(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → text</code></h3>
-
-Like `timeit.s()`, but returns result a time unit pretty formatted text string, e.g. "100 ms".
-
-<h3 id="timeit-f"><code>timeit.f(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → float8</code></h3>
-
-Like `timeit.s()`, but returns the result as a float8 without rounding to significant figures.
-
-<h3 id="timeit-async"><code>timeit.async(function_name [, input_values ] [, significant_figures] [, timeout] [, attempts] [, min_time]) → bigint</code></h3>
+<h3 id="timeit-t">timeit.t → text</h3>
 
   Input Parameter     | Type     | Default
 --------------------- | -------- | -----------
- function_name        | text     |
- input_values         | text[]   | ARRAY[]::text[]
+ function_name        | text     | 
+ input_values         | text[]   | 
  significant_figures  | integer  | 1
- timeout              | interval | NULL
- attempts             | integer  | 1
- min_time             | interval | 10 ms
+ r_squared_threshold  | float8   | 0.99
+ sample_size          | integer  | 10
+ timeout              | interval | 1 second
+ core_id              | integer  | -1
 
-Request measurement of the execution run time of `function_name`.
+Returns measured execution time in human-readable format.
 
-Returns a bigint `id` value that is the primary key in the `timeit.tests` table where the requested test is stored to.
+<h3 id="timeit-measure">timeit.measure → TABLE</h3>
 
-<h3 id="timeit-now"><code>timeit.work()</code></h3>
+  Input Parameter     | Type     | Default
+--------------------- | -------- | -----------
+ function_name        | text     | 
+ input_values         | text[]   | 
+ r_squared_threshold  | float8   | 0.99
+ sample_size          | integer  | 10
+ timeout              | interval | 1 second
+ measure_type         | timeit.measure_type | 'time'
+ core_id              | integer  | -1
 
-This procedure performs the measurements requested by `timeit.async()` and is supposed to be called in a loop from a script or cronjob.
+  Output Column       | Type    
+--------------------- | --------
+ r_squared            | float8  
+ slope                | float8  
+ intercept            | float8  
+ iterations           | bigint  
 
-See the [Installation](#installation) section for how to daemonize it.
+The `timeit.measure` function benchmarks the execution time or cycles of a
+specified function (`function_name`) using provided arguments (`input_values`).
 
-<h2 id="api">6. Internal types</h2>
+It measures performance by iterating the function call, collecting a specified
+number of samples (`sample_size`).
 
-<h3 id="test-state"><code>test_state</code></h3>
+The `measure_type` can be either 'time' or 'cycles', and it can be run on a
+specified CPU core (`core_id`).
 
-`timeit.test_state` is an `ENUM` with the following elements:
+During benchmarking, the number of iterations is doubled each time until all of
+these conditions are met:
 
-- **init**: Test has just been initiated.
-- **run_test_1**: First test should be executed.
-- **run_test_2**: Second test should be executed.
-- **final**: The final result has been determined.
+- The R-squared value meets or exceeds the threshold.
+- The slope is greater than zero, indicating that more iterations naturally
+  lead to longer measured times or higher cycle counts.
+- The intercept is greater than zero, accounting for the inherent overhead
+  in executing the function.
+
+Alternatively, benchmarking stops if the timeout is reached and at least two 
+measurements have been completed.
+
+The `timeit.measure` function returns a table with the following columns:
+`r_squared`, `slope`, `intercept`, and `iterations`. The `r_squared` value
+indicates how well the regression line fits the data. The `slope` represents
+the execution time per iteration in microseconds if `measure_type` is 'time',
+or cycles if `measure_type` is 'cycles'. The `intercept` is in the same unit
+as the slope and represents the overhead of executing the function.
+The `iterations` value is the total number of iterations performed in
+the last measurement.
+
+<h2 id="types">6. Types</h2>
+
+<h3 id="measure-type">timeit.measure_type</h3>
+
+`timeit.measure_type` is an `ENUM` with the following elements:
+
+- **cycles**: Measure clock cycles.
+- **time**: Measure time in microseconds.
 
 <h2 id="internal-functions">7. Internal functions</h2>
 
-<h3 id="timeit-round-to-sig-figs"><code>timeit.round_to_sig_figs(numeric, integer) → numeric</code></h3>
+<h3 id="timeit-round-to-sig-figs">timeit.round_to_sig_figs → numeric</h3>
+
+  Input Parameter     | Type     
+--------------------- | -------- 
+ numeric_value        | numeric  
+ significant_figures  | integer  
 
 Round `numeric` value to `integer` number of significant figures.
 
@@ -310,52 +187,141 @@ SELECT timeit.round_to_sig_figs(0.00012456,3);
 -------------------
           0.000125
 (1 row)
-
 ```
 
-<h3 id="timeit-measure"><code>timeit.measure(function_name text, input_values text[], executions bigint) -> numeric</code></h3>
+There is also a `bigint` overload:
+`timeit.round_to_sig_figs(bigint, integer) → bigint`
 
-Performs `executions` number of executions of `function_name` with arguments passed via `input_values`.
+<h3 id="timeit-compute-regression-metrics">timeit.compute_regression_metrics → TABLE</h3>
 
-<h3 id="timeit-eval"><code>timeit.eval(function_name text, input_values text[]) -> text</code></h3>
+  Input Parameter     | Type     
+--------------------- | -------- 
+ x                    | float8[] 
+ y                    | float8[] 
 
-Performs a single execution of `function_name` with arguments passed via `input_values`.
+  Output Column       | Type    
+--------------------- | -------- 
+ r_squared            | float8   
+ slope                | float8   
+ intercept            | float8   
 
-Returns the result casted to text.
+Calculates the regression metrics for benchmarking the execution time or cycles 
+of functions, returning the coefficient of determination (R-squared), the slope 
+(time or cycles), and the intercept (overhead).
 
-<h2 id="api">8. Examples</h2>
+#### Parameters
+- **x**: Independent variable values representing the number of 
+         iterations.
+- **y**: Dependent variable values representing the measured 
+         execution times or cycles.
 
-Let's say we want to measure the execution time of
+#### Returns
+A table with:
+- **r_squared**: Indicates how well the regression line fits the data  (0 to 1).
+- **slope**: Represents the execution time or cycles per iteration.
+- **intercept**: Represents the fixed overhead time or cycles.
 
-    1.5 + 2.5
+#### Requirements
+- Arrays must have at least two elements.
+- Arrays must be of the same length.
 
-Under the hood, the arithmetic add operation is computed using
+#### Exceptions
+- Raises an exception if arrays have fewer than two elements.
+- Raises an exception if arrays are of different lengths.
 
-    numeric_add(1.5,2.5)
-
-so the following two statements do the same thing:
-
+#### Example
 ```sql
-SELECT 1.5 + 2.5;
- ?column?
-----------
-      4.0
-(1 row)
+SELECT * FROM timeit.compute_regression_metrics(
+    ARRAY[1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+    ARRAY[11.3, 21.5, 42.0, 81.2, 167.3, 334.4, 650.7, 1292.2, 2572.3, 5132.3]
+);
 
-SELECT numeric_add(1.5, 2.5);
- numeric_add
--------------
-         4.0
+     r_squared      |       slope        |     intercept
+--------------------+--------------------+-------------------
+ 0.9999925121104006 | 10.018782621621654 | 5.598537808104993
 (1 row)
 ```
 
-To measure it:
+<h3 id="timeit-pretty-time">timeit.pretty_time(numeric) → text</h3>
+
+Returns measured execution time in human-readable output using time unit suffixes.
+
+There is also an overload:
+`timeit.pretty_time(numeric, significant_figures integer) → text`
+
+<h3 id="timeit-measure-time">timeit.measure_time → bigint</h3>
+
+  Input Parameter     | Type     
+--------------------- | -------- 
+ internal_function    | text     
+ input_values         | text[]   
+ iterations           | bigint   
+ core_id              | integer  
+
+Measures execution time for `internal_function` with `input_values` over
+a specified number of `iterations`, on given CPU `core_id`.
+
+If `-1` is specified as `core_id`, the kernel will be responsible for
+CPU core scheduling.
+
+<h3 id="timeit-measure-cycles">timeit.measure_cycles</h3>
+
+  Input Parameter     | Type     
+--------------------- | -------- 
+ internal_function    | text     
+ input_values         | text[]   
+ iterations           | bigint   
+ core_id              | integer  
+
+Measures clock cycles for `internal_function` with `input_values` over
+a specified number of `iterations`, on given CPU `core_id`.
+
+If `-1` is specified as `core_id`, the kernel will be responsible for
+CPU core scheduling.
+
+<h3 id="timeit-eval">timeit.eval → text</h3>
+
+  Input Parameter     | Type     
+--------------------- | -------- 
+ function_name        | text     
+ input_values         | text[]   
+
+Performs a single execution of `function_name` with arguments passed
+via `input_values`.
+
+Returns the result cast to text.
+
+<h2 id="examples">8. Examples</h2>
 
 ```sql
-SELECT timeit.h('numeric_add', ARRAY['1.5','2.5']);
-   h
+SELECT timeit.t('pg_sleep', ARRAY['0.01']);
+   t
 -------
- 60 ns
+ 10 ms
+(1 row)
+```
+
+```sql
+SELECT timeit.t('now', ARRAY[]::text[]);
+  t
+------
+ 3 ns
+(1 row)
+```
+
+```sql
+SELECT timeit.t('clock_timestamp', ARRAY[]::text[]);
+   t
+-------
+ 20 ns
+(1 row)
+```
+
+```sql
+SELECT timeit.t('numeric_add', ARRAY['1.5','2.5']);
+   t
+-------
+ 50 ns
 (1 row)
 ```
 
@@ -364,111 +330,9 @@ By default, a result with one significant figure is produced.
 If we instead want two significant figures:
 
 ```sql
-SELECT timeit.h('numeric_add', ARRAY['1.5','2.5'], 2);
-   h
+SELECT timeit.t('numeric_add', ARRAY['1.5','2.5'], 2);
+   t
 -------
- 24 ns
+ 52 ns
 (1 row)
 ```
-
-We could never measure such a short duration simply by using `psql`'s `\timing`,
-or `EXPLAIN ANALYZE`.
-
-```sql
-=# \timing
-Timing is on.
-=# EXPLAIN ANALYZE SELECT 1.5 + 2.5;
-                                     QUERY PLAN
--------------------------------------------------------------------------------------
- Result  (cost=0.00..0.01 rows=1 width=32) (actual time=0.002..0.003 rows=1 loops=1)
- Planning Time: 0.088 ms
- Execution Time: 0.024 ms
-(3 rows)
-
-Time: 0.909 ms
-```
-
-It's noteworthy both `0.024 ms` and `0.909 ms` are wrong with several orders
-of magnitude, which is expected, and not a critisism, since they report the
-time for the entire statement, not just the expression that we're interested in.
-
-To understand how off these values are from each other,
-let's convert them to seconds to allow visual comparison:
-
-```
-0.000024    <-- EXPLAIN ANALYZE "Exeuction Time"
-0.000909    <-- \timing
-0.000000024 <-- timeit.h()
-```
-
-But how do we know the claimed exeuction time by `timeit.h()` is reasonable?
-
-Let's demonstrate how we can verify it manually, only standard PostgreSQL
-and its existing system catalog functions.
-
-If it's true that the exeuction time is 24 ns, it should take about 2.4 s
-to do 1e8 executions. We will use `generate_series()` for the executions,
-but we first have to solve two problems. We have to account for the
-overhead of `generate_series()`. We must also avoid caching of the
-immutable expression, and create a volatile version of `numeric_add`.
-
-```sql
-CREATE FUNCTION numeric_add_volatile(numeric,numeric)
-RETURNS numeric
-VOLATILE
-LANGUAGE internal
-AS 'numeric_add';
-```
-
-Let's measure the overhead time of generate_series:
-
-```sql
-SELECT count(null) FROM generate_series(1,1e8);
- count
--------
-     0
-(1 row)
-
-Time: 11344.158 ms (00:11.344)
-```
-
-The execution time is not notably affected by an immutable expression,
-since it's only computed once, and that time is minuscule in relation to
-the time to generate the 1e8 long series:
-
-```sql
-SELECT count(1.5 + 2.5) FROM generate_series(1,1e8);
-   count
------------
- 100000000
-(1 row)
-
-Time: 11688.894 ms (00:11.689)
-```
-
-If we now instead invoke our volatile version of it, we will notice how it
-takes about 3 seconds longer time, which nicely matches the `timeit.h()`
-returned result:
-
-```sql
-SELECT count(numeric_add_volatile(1.5, 2.5)) FROM generate_series(1,1e8);
-   count
------------
- 100000000
-(1 row)
-
-Time: 14524.570 ms (00:14.525)
-
-SELECT 14.525-11.344;
- ?column?
-----------
-    3.181
-(1 row)
-```
-
-Note how `3.181 s` is quite close to the predicted time `2.4 s`.
-
-Under the hood, `timeit` measures the execution time by executing the function
-using C, and doesn't use `generate_series()` at all. This was only meant to
-demonstrate how users could verify the correctness of the timeit measurements,
-using tools available in standard PostgreSQL.

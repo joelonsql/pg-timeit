@@ -1,1 +1,1 @@
-CREATE TYPE timeit.measure_type AS ENUM ('clock_cycles', 'time');
+CREATE TYPE timeit.measure_type AS ENUM ('cycles', 'time');

@@ -1,8 +1,8 @@
 --
--- Returns measured clock cycles as a bigint,
--- rounded to significant_figures
+-- Returns measured execution time in human-readable output,
+-- using time unit suffixes, i.e. "ns", "us", "ms".
 --
-CREATE OR REPLACE FUNCTION timeit.c
+CREATE OR REPLACE FUNCTION timeit.t
 (
     function_name text,
     input_values text[],
@@ -12,10 +12,11 @@ CREATE OR REPLACE FUNCTION timeit.c
     timeout interval DEFAULT '1 second'::interval,
     core_id integer DEFAULT -1 /* -1 means let the OS schedule CPU core */
 )
-RETURNS bigint
+RETURNS text
 LANGUAGE SQL AS
 $$
-    SELECT timeit.round_to_sig_figs(measure.slope::bigint, significant_figures)
+    -- slope value is in microseconds for measure_type 'time'
+    SELECT timeit.pretty_time((measure.slope/1e6)::numeric, significant_figures)
     FROM timeit.measure(function_name, input_values, r_squared_threshold,
-                        sample_size, timeout, 'cycles', core_id);
+                        sample_size, timeout, 'time', core_id);
 $$;

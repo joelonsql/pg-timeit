@@ -6,8 +6,8 @@ CREATE OR REPLACE FUNCTION timeit.compute_regression_metrics
 RETURNS TABLE
 (
     r_squared float8,
-    m float8,
-    c float8
+    slope float8,
+    intercept float8
 )
 LANGUAGE plpgsql
 AS $$
@@ -36,8 +36,8 @@ begin
 
     if (n * sum_x2 - sum_x^2) <> 0 and (n * sum_y2 - sum_y^2) <> 0 then
         r_squared := (n * sum_xy - sum_x * sum_y)^2 / ((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
-        m := (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x^2);
-        c := (sum_y - m * sum_x) / n;
+        slope := (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x^2);
+        intercept := (sum_y - slope * sum_x) / n;
         return next;
     end if;
 end
