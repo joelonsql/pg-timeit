@@ -3,7 +3,8 @@ CREATE OR REPLACE FUNCTION timeit.min_executions_r2(
     input_values text[],
     r2_threshold float8,
     core_id integer,
-    measure_type timeit.measure_type
+    measure_type timeit.measure_type,
+    timeout interval DEFAULT '1 second'::interval
 )
 RETURNS bigint
 LANGUAGE plpgsql
@@ -21,11 +22,13 @@ declare
     n integer;
     m float8;
     c float8;
+    t0 timestamptz;
 begin
     if (r2_threshold between 0.99 and 1.0) is not true then
         raise exception 'r2_threshold must be between 0.99 and 1.0';
     end if;
 
+    t0 := clock_timestamp();
     loop
         if measure_type = 'clock_cycles' then
             clock_cycles := timeit.measure_rdtsc(function_name, input_values, iterations, core_id);
@@ -66,7 +69,8 @@ begin
                 r_squared := 0;
             end if;
 
-            if r_squared >= r2_threshold and m > 0 and c >= 0 then
+            if (r_squared >= r2_threshold and m > 0 and c >= 0)
+            or (clock_timestamp() - t0 > timeout) then
                 return iterations;
             end if;
         end if;
