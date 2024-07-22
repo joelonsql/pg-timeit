@@ -9,7 +9,8 @@ CREATE OR REPLACE FUNCTION timeit.f(
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
     min_time interval DEFAULT '10 ms'::interval,
-    core_id integer DEFAULT -1
+    core_id integer DEFAULT -1,
+    r2_threshold float8 DEFAULT NULL
 )
 RETURNS float8
 LANGUAGE plpgsql
@@ -41,7 +42,13 @@ begin
         raise exception 'timeout must be larger than at least twice the min_time';
     end if;
 
-    executions := timeit.min_executions(function_name, input_values, min_time, core_id);
+    if min_time is not null and r2_threshold is null then
+        executions := timeit.min_executions(function_name, input_values, min_time, core_id);
+    elsif r2_threshold is not null and min_time is null then
+        executions := timeit.min_executions_r2(function_name, input_values, r2_threshold, core_id, 'time');
+    else
+        raise exception 'exactly one of min_time % and r2_threshold % must be set', min_time, r2_threshold;
+    end if;
 
     remaining_attempts := attempts;
 
@@ -79,7 +86,14 @@ begin
             extract(epoch from timeout) * 1e6
         then
 
-            executions := timeit.min_executions(function_name, input_values, min_time, core_id);
+            if min_time is not null and r2_threshold is null then
+                executions := timeit.min_executions(function_name, input_values, min_time, core_id);
+            elsif r2_threshold is not null and min_time is null then
+                executions := timeit.min_executions_r2(function_name, input_values, r2_threshold, core_id, 'time');
+            else
+                raise exception 'exactly one of min_time and r2_threshold must be set';
+            end if;
+
             if remaining_attempts = 0 then
                 remaining_attempts := attempts;
                 significant_figures := significant_figures - 1;

@@ -8,3 +8,4 @@ timeit.o
 timeit.so
 timeit.dylib
 .vscode
+.deps

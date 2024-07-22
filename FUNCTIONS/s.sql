@@ -9,13 +9,14 @@ CREATE OR REPLACE FUNCTION timeit.s(
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
     min_time interval DEFAULT '10 ms'::interval,
-    core_id integer DEFAULT -1
+    core_id integer DEFAULT -1,
+    r2_threshold float8 DEFAULT NULL
 )
 RETURNS numeric
 LANGUAGE sql
 AS $$
     SELECT timeit.round_to_sig_figs(
-        timeit.f($1,$2,$3,$4,$5,$6,$7)::numeric,
+        timeit.f($1,$2,$3,$4,$5,$6,$7,$8)::numeric,
         $3
     );
 $$;

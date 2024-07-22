@@ -9,10 +9,11 @@ CREATE OR REPLACE FUNCTION timeit.h(
     timeout interval DEFAULT NULL,
     attempts integer DEFAULT 1,
     min_time interval DEFAULT '10 ms'::interval,
-    core_id integer DEFAULT -1
+    core_id integer DEFAULT -1,
+    r2_threshold float8 DEFAULT NULL
 )
 RETURNS text
 LANGUAGE sql
 AS $$
-SELECT timeit.pretty_time(timeit.s($1,$2,$3,$4,$5,$6,$7))
+SELECT timeit.pretty_time(timeit.s($1,$2,$3,$4,$5,$6,$7,$8))
 $$;
