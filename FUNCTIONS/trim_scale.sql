@@ -12,12 +12,9 @@ BEGIN
         $_$
             CREATE OR REPLACE FUNCTION timeit.trim_scale(numeric) RETURNS numeric AS
             $__$
-                DECLARE
-                    trimmed numeric;
                 BEGIN
                     -- Convert the numeric to text, trim trailing zeros and then convert back to numeric
-                    SELECT regexp_replace($1::text, '\.?0+$', '')::numeric INTO trimmed;
-                    RETURN trimmed;
+                    RETURN regexp_replace($1::text, '(\.\d*?[1-9])0+$|\.0+$', '\1')::numeric;
                 END;
             $__$ LANGUAGE plpgsql IMMUTABLE;
         $_$;
