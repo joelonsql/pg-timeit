@@ -11,68 +11,60 @@ LANGUAGE plpgsql
 AS $$
 declare
     iterations bigint := 1;
-    sum_x float8 := 0;
-    sum_y float8 := 0;
-    sum_xy float8 := 0;
-    sum_x2 float8 := 0;
-    sum_y2 float8 := 0;
-    r_squared float8 := 0;
-    clock_cycles bigint;
-    measurements bigint[] := '{}';
+    res float8;
+    y float8[] := '{}';
+    x float8[] := '{}';
     n integer;
+    r_squared float8;
     m float8;
     c float8;
     t0 timestamptz;
 begin
-    if (r2_threshold between 0.99 and 1.0) is not true then
-        raise exception 'r2_threshold must be between 0.99 and 1.0';
+    if (r2_threshold between 0.99 and 0.99999) is not true then
+        raise exception 'r2_threshold must be between 0.99 and 0.99999';
     end if;
 
     t0 := clock_timestamp();
     loop
         if measure_type = 'clock_cycles' then
-            clock_cycles := timeit.measure_rdtsc(function_name, input_values, iterations, core_id);
+            res := timeit.measure_rdtsc(function_name, input_values, iterations, core_id)::float8;
         elsif measure_type = 'time' then
-            clock_cycles := timeit.measure(function_name, input_values, iterations, core_id);
+            res := timeit.measure(function_name, input_values, iterations, core_id)::float8;
         else
             raise exception 'invalid measure_type %', measure_type;
         end if;
 
-        measurements := array_append(measurements, clock_cycles);
-        n := array_length(measurements, 1);
+        y := array_append(y, res);
+        x := array_append(x, iterations::float8);
+        n := array_length(y, 1);
 
-        if n > 1 then
-            sum_x := 0;
-            sum_y := 0;
-            sum_xy := 0;
-            sum_x2 := 0;
-            sum_y2 := 0;
-            for i in 1..n loop
-                sum_x := sum_x + 2^(i-1);
-                sum_y := sum_y + measurements[i];
-                sum_xy := sum_xy + 2^(i-1) * measurements[i];
-                sum_x2 := sum_x2 + (2^(i-1))^2;
-                sum_y2 := sum_y2 + measurements[i]^2;
-            end loop;
+        if n >= 3 then
+            --
+            -- The first measurements could be noisy, so let's only look at
+            -- up to three of the last values.
+            --
+            SELECT r.r_squared, r.m, r.c
+            INTO r_squared, m, c
+            FROM timeit.compute_regression_metrics(x[n-2:n], y[n-2:n]) AS r;
 
-            if (n * sum_x2 - sum_x^2) <> 0 and (n * sum_y2 - sum_y^2) <> 0 then
-                r_squared := (n * sum_xy - sum_x * sum_y)^2 / ((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
-                m := (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x^2);
-                c := (sum_y - m * sum_x) / n;
-                if m > 0 and c >= 0 then
-                    raise debug 'Predicted formula: y = % * x + %', m, c;
-                else
-                    raise debug 'Negative slope or overhead detected, continuing with more iterations.';
-                    r_squared := 0; -- Reset r_squared to ensure continuation
-                end if;
-            else
-                r_squared := 0;
+            raise debug 'Predicted formula: y = % * x + %, r_squared = %, iterations = %', m, c, r_squared, iterations;
+
+            if (m > 0 and c >= 0) is not true then
+                raise debug 'Negative slope or overhead detected, continuing with more iterations.';
+                r_squared := 0; -- Reset r_squared to ensure continuation
             end if;
 
-            if (r_squared >= r2_threshold and m > 0 and c >= 0)
-            or (clock_timestamp() - t0 > timeout) then
+            if r_squared >= r2_threshold and m > 0 and c > 0 then
                 return iterations;
             end if;
+        end if;
+
+        --
+        -- Return if we've spent more than timeout already.
+        --
+        if clock_timestamp() - t0 > timeout then
+            raise debug 'Timeout';
+            return iterations;
         end if;
 
         iterations := iterations * 2;

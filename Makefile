@@ -27,6 +27,7 @@ SQL_SRC = \
 	FUNCTIONS/measure.sql \
 	FUNCTIONS/measure_rdtsc.sql \
 	FUNCTIONS/min_executions.sql \
+	FUNCTIONS/compute_regression_metrics.sql \
 	FUNCTIONS/min_executions_r2.sql \
 	FUNCTIONS/overhead.sql \
 	FUNCTIONS/overhead_rdtsc.sql \

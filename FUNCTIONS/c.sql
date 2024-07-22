@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION timeit.c(
     timeout bigint DEFAULT NULL,
     attempts integer DEFAULT 1,
     core_id integer DEFAULT -1,
-    r2_threshold float8 DEFAULT 0.999
+    r2_threshold float8 DEFAULT 0.99
 )
 RETURNS float8
 LANGUAGE plpgsql
