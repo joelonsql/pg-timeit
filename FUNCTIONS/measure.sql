@@ -10,6 +10,8 @@ CREATE OR REPLACE FUNCTION timeit.measure
 )
 RETURNS TABLE
 (
+    x float8[],
+    y float8[],
     r_squared float8,
     slope float8,
     intercept float8,
@@ -19,8 +21,6 @@ LANGUAGE plpgsql
 AS $$
 declare
     res float8;
-    y float8[] := '{}';
-    x float8[] := '{}';
     n integer;
     t0 timestamptz;
     is_timeout boolean;
@@ -30,6 +30,8 @@ begin
     end if;
 
     iterations := 1;
+    x := ARRAY[]::float8[];
+    y := ARRAY[]::float8[];
     t0 := clock_timestamp();
     loop
         if measure_type = 'cycles' then

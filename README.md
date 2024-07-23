@@ -114,6 +114,8 @@ Returns measured execution time in human-readable format.
 
   Output Column       | Type    
 --------------------- | --------
+ x                    | float8[]
+ y                    | float8[]
  r_squared            | float8  
  slope                | float8  
  intercept            | float8  
@@ -141,13 +143,21 @@ Alternatively, benchmarking stops if the timeout is reached and at least two
 measurements have been completed.
 
 The `timeit.measure` function returns a table with the following columns:
-`r_squared`, `slope`, `intercept`, and `iterations`. The `r_squared` value
-indicates how well the regression line fits the data. The `slope` represents
-the execution time per iteration in microseconds if `measure_type` is 'time',
-or cycles if `measure_type` is 'cycles'. The `intercept` is in the same unit
-as the slope and represents the overhead of executing the function.
-The `iterations` value is the total number of iterations performed in
-the last measurement.
+`x`, `y`, `r_squared`, `slope`, `intercept`, and `iterations`.
+
+The `x` and `y` arrays contain the independent and dependent variable values
+used for regression analysis.
+
+The `r_squared` value indicates how well the regression line fits the data.
+
+The `slope` represents the execution time per iteration in microseconds
+if `measure_type` is 'time', or cycles if `measure_type` is 'cycles'.
+
+The `intercept` is in the same unit as the slope and represents the overhead of
+executing the function.
+
+The `iterations` value is the total number of iterations performed in the
+last measurement and corresponds to the last element of the `x` array.
 
 <h2 id="types">6. Types</h2>
 
