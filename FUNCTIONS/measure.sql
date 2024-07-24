@@ -55,7 +55,7 @@ begin
 
             raise debug 'Predicted formula: y = % * x + %, r_squared = %, iterations = %', slope, intercept, r_squared, iterations;
 
-            if r_squared >= r_squared_threshold and slope > 0 and intercept > 0 then
+            if r_squared >= r_squared_threshold and slope > 0 then
                 return next;
                 return;
             end if;
