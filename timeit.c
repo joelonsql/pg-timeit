@@ -21,16 +21,27 @@ PG_MODULE_MAGIC;
 
 #ifdef HAVE_SCHED_SETAFFINITY
 static void
-set_cpu_affinity(int core_id)
+create_cpuset_for_core(int core_id, cpu_set_t *cpuset)
 {
-	cpu_set_t	cpuset;
-	pid_t		pid;
+	CPU_ZERO(cpuset);
+	CPU_SET(core_id, cpuset);
+}
 
-	CPU_ZERO(&cpuset);
-	CPU_SET(core_id, &cpuset);
+static void
+get_cpu_affinity(cpu_set_t *cpuset)
+{
+	pid_t pid = getpid();
+	if (sched_getaffinity(pid, sizeof(cpu_set_t), cpuset) != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("sched_getaffinity failed")));
+}
 
-	pid = getpid();
-	if (sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset) != 0)
+static void
+set_cpu_affinity(const cpu_set_t *cpuset)
+{
+	pid_t pid = getpid();
+	if (sched_setaffinity(pid, sizeof(cpu_set_t), cpuset) != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("sched_setaffinity failed")));
@@ -76,7 +87,6 @@ static void prepare_function_call(text *internal_function_name,
 								  FunctionCallInfo fcinfo,
 								  FunctionCallData *fcd);
 static void free_function_call_data(FunctionCallData *fcd);
-
 
 PG_FUNCTION_INFO_V1(eval);
 PG_FUNCTION_INFO_V1(measure_time);
@@ -272,19 +282,25 @@ measure_time(PG_FUNCTION_ARGS)
 	TimestampTz			end_time;
 	int64				total_time;
 	FunctionCallInfo	testfunc_fcinfo;
+#ifdef HAVE_SCHED_SETAFFINITY
+	cpu_set_t			old_cpuset;
+	cpu_set_t			new_cpuset;
+#endif
 
 	if (number_of_iterations <= 0)
 		ereport(ERROR,
-				 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				  errmsg("number_of_iterations must be at least one, but is %ld",
-						 number_of_iterations)));
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("number_of_iterations must be at least one, but is %ld",
+						number_of_iterations)));
 
 	prepare_function_call(internal_function_name, input_values, fcinfo, &fcd);
 
 	if (core_id != -1)
 	{
 #ifdef HAVE_SCHED_SETAFFINITY
-		set_cpu_affinity(core_id);
+		get_cpu_affinity(&old_cpuset);
+		create_cpuset_for_core(core_id, &new_cpuset);
+		set_cpu_affinity(&new_cpuset);
 #else
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg("not supported on this architecture")));
@@ -297,6 +313,11 @@ measure_time(PG_FUNCTION_ARGS)
 		FunctionCallInvoke(testfunc_fcinfo);
 	end_time = GetCurrentTimestamp();
 	total_time = end_time - start_time;
+
+#ifdef HAVE_SCHED_SETAFFINITY
+	if (core_id != -1)
+		set_cpu_affinity(&old_cpuset);
+#endif
 
 	free_function_call_data(&fcd);
 
@@ -324,6 +345,10 @@ measure_cycles(PG_FUNCTION_ARGS)
 	int64				end_cycles;
 	int64				total_cycles;
 	FunctionCallInfo	testfunc_fcinfo;
+#ifdef HAVE_SCHED_SETAFFINITY
+	cpu_set_t			old_cpuset;
+	cpu_set_t			new_cpuset;
+#endif
 
 	if (number_of_iterations <= 0)
 		ereport(ERROR,
@@ -335,7 +360,9 @@ measure_cycles(PG_FUNCTION_ARGS)
 
 	if (core_id != -1)
 	{
-		set_cpu_affinity(core_id);
+		get_cpu_affinity(&old_cpuset);
+		create_cpuset_for_core(core_id, &new_cpuset);
+		set_cpu_affinity(&new_cpuset);
 	}
 
 	testfunc_fcinfo = fcd.testfunc_fcinfo;
@@ -344,6 +371,9 @@ measure_cycles(PG_FUNCTION_ARGS)
 		FunctionCallInvoke(testfunc_fcinfo);
 	end_cycles = rdtsc_e();
 	total_cycles = end_cycles - start_cycles;
+
+	if (core_id != -1)
+		set_cpu_affinity(&old_cpuset);
 
 	free_function_call_data(&fcd);
 
