@@ -91,6 +91,8 @@ static void free_function_call_data(FunctionCallData *fcd);
 PG_FUNCTION_INFO_V1(eval);
 PG_FUNCTION_INFO_V1(measure_time);
 PG_FUNCTION_INFO_V1(measure_cycles);
+PG_FUNCTION_INFO_V1(overhead_time);
+PG_FUNCTION_INFO_V1(overhead_cycles);
 
 static Oid
 lookup_internal_function(char *internal_function_name_c_string)
@@ -369,6 +371,125 @@ measure_cycles(PG_FUNCTION_ARGS)
 	start_cycles = rdtsc_s();
 	for (int64 i = 0; i < number_of_iterations; i++)
 		FunctionCallInvoke(testfunc_fcinfo);
+	end_cycles = rdtsc_e();
+	total_cycles = end_cycles - start_cycles;
+
+	if (core_id != -1)
+		set_cpu_affinity(&old_cpuset);
+
+	free_function_call_data(&fcd);
+
+	PG_RETURN_INT64(total_cycles);
+#else
+	ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("not supported on this architecture")));
+#endif
+}
+
+/*
+ * SQL-callable function timeit.overhead_time().
+ *
+ * Executes an empty for loop as many times as specified,
+ * and return the measured time in microseconds as an int64 Datum.
+ */
+
+Datum
+overhead_time(PG_FUNCTION_ARGS)
+{
+	text			   *internal_function_name = PG_GETARG_TEXT_P(0);
+	ArrayType		   *input_values = PG_GETARG_ARRAYTYPE_P(1);
+	int64				number_of_iterations = PG_GETARG_INT64(2);
+	int					core_id = PG_GETARG_INT32(3);
+	FunctionCallData	fcd;
+	TimestampTz			start_time;
+	TimestampTz			end_time;
+	int64				total_time;
+#ifdef HAVE_SCHED_SETAFFINITY
+	cpu_set_t			old_cpuset;
+	cpu_set_t			new_cpuset;
+#endif
+
+	if (number_of_iterations <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("number_of_iterations must be at least one, but is %ld",
+						number_of_iterations)));
+
+	prepare_function_call(internal_function_name, input_values, fcinfo, &fcd);
+
+	if (core_id != -1)
+	{
+#ifdef HAVE_SCHED_SETAFFINITY
+		get_cpu_affinity(&old_cpuset);
+		create_cpuset_for_core(core_id, &new_cpuset);
+		set_cpu_affinity(&new_cpuset);
+#else
+		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						errmsg("not supported on this architecture")));
+#endif
+	}
+
+	start_time = GetCurrentTimestamp();
+    for (volatile int64 i = 0; i < number_of_iterations; i++)
+    {
+    }
+	end_time = GetCurrentTimestamp();
+	total_time = end_time - start_time;
+
+#ifdef HAVE_SCHED_SETAFFINITY
+	if (core_id != -1)
+		set_cpu_affinity(&old_cpuset);
+#endif
+
+	free_function_call_data(&fcd);
+
+	/* Return total execution time in microseconds. */
+	PG_RETURN_INT64(total_time);
+}
+
+/*
+ * SQL-callable function timeit.overhead_cycles().
+ *
+ * Executes an empty for loop as many times as specified,
+ * and return the measured number of clock cycles as an int64 Datum.
+ */
+
+Datum
+overhead_cycles(PG_FUNCTION_ARGS)
+{
+#ifdef HAVE_SCHED_SETAFFINITY
+	text			   *internal_function_name = PG_GETARG_TEXT_P(0);
+	ArrayType		   *input_values = PG_GETARG_ARRAYTYPE_P(1);
+	int64				number_of_iterations = PG_GETARG_INT64(2);
+	int					core_id = PG_GETARG_INT32(3);
+	FunctionCallData	fcd;
+	int64				start_cycles;
+	int64				end_cycles;
+	int64				total_cycles;
+#ifdef HAVE_SCHED_SETAFFINITY
+	cpu_set_t			old_cpuset;
+	cpu_set_t			new_cpuset;
+#endif
+
+	if (number_of_iterations <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("number_of_iterations must be at least one, but is %ld",
+						number_of_iterations)));
+
+	prepare_function_call(internal_function_name, input_values, fcinfo, &fcd);
+
+	if (core_id != -1)
+	{
+		get_cpu_affinity(&old_cpuset);
+		create_cpuset_for_core(core_id, &new_cpuset);
+		set_cpu_affinity(&new_cpuset);
+	}
+
+	start_cycles = rdtsc_s();
+    for (volatile int64 i = 0; i < number_of_iterations; i++)
+    {
+    }
 	end_cycles = rdtsc_e();
 	total_cycles = end_cycles - start_cycles;
 

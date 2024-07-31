@@ -21,6 +21,8 @@ SQL_SRC = \
 	FUNCTIONS/compute_regression_metrics.sql \
 	FUNCTIONS/measure_time.sql \
 	FUNCTIONS/measure_cycles.sql \
+	FUNCTIONS/overhead_time.sql \
+	FUNCTIONS/overhead_cycles.sql \
 	FUNCTIONS/eval.sql \
 	FUNCTIONS/measure.sql \
 	FUNCTIONS/t.sql \
