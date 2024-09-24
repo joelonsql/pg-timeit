@@ -527,6 +527,7 @@ overhead_cycles(PG_FUNCTION_ARGS)
  * Executes the specified SQL query once,
  * and returns planning time, execution time, and HPC data as record fields.
  */
+
 Datum
 time_query(PG_FUNCTION_ARGS)
 {
@@ -580,7 +581,7 @@ time_query(PG_FUNCTION_ARGS)
 	pe.disabled = 1;
 	pe.exclude_kernel = 1;
 	pe.exclude_hv = 1;
-	pe.read_format = PERF_FORMAT_GROUP | PERF_FORMAT_ID;
+	pe.read_format = PERF_FORMAT_GROUP; /* Removed PERF_FORMAT_ID */
 
 	/* Open performance counters */
 	for (i = 0; i < num_events; i++)
@@ -680,8 +681,8 @@ time_query(PG_FUNCTION_ARGS)
 	if (fds[0] != -1)
 	{
 		ssize_t		read_bytes;
-		size_t		buf_size = sizeof(uint64) * (3 + num_events);
-		uint64	   *buf = palloc0(buf_size); /* nr, time_enabled, time_running, values... */
+		size_t		buf_size = sizeof(uint64) * (1 + num_events);
+		uint64	   *buf = palloc0(buf_size); /* nr, values... */
 
 		read_bytes = read(fds[0], buf, buf_size);
 		if (read_bytes == -1)
@@ -699,7 +700,7 @@ time_query(PG_FUNCTION_ARGS)
 		for (i = 0; i < num_events; i++)
 		{
 			if (fds[i] != -1)
-				counts[i] = buf[3 + i];
+				counts[i] = buf[1 + i];
 			else
 				counts[i] = 0; /* Event was not opened */
 		}
