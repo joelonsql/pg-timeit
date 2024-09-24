@@ -1,6 +1,7 @@
 #include "postgres.h"
 #include "funcapi.h"
 #include "catalog/pg_proc.h"
+#include "executor/spi.h"
 #include "utils/builtins.h"
 #include "utils/array.h"
 #include "utils/timestamp.h"
@@ -93,6 +94,7 @@ PG_FUNCTION_INFO_V1(measure_time);
 PG_FUNCTION_INFO_V1(measure_cycles);
 PG_FUNCTION_INFO_V1(overhead_time);
 PG_FUNCTION_INFO_V1(overhead_cycles);
+PG_FUNCTION_INFO_V1(time_query);
 
 static Oid
 lookup_internal_function(char *internal_function_name_c_string)
@@ -503,4 +505,80 @@ overhead_cycles(PG_FUNCTION_ARGS)
 	ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					errmsg("not supported on this architecture")));
 #endif
+}
+
+/*
+ * SQL-callable function timeit.time_query().
+ *
+ * Executes the specified SQL query once, and returns a record with the
+ * measured planning_time and execution_time.
+ */
+Datum
+time_query(PG_FUNCTION_ARGS) {
+	text 	   *sql_query = PG_GETARG_TEXT_P(0);
+	char	   *sql_query_cstring;
+	TimestampTz start_time, end_time;
+	int64		planning_time_us, execution_time_us;
+	double		planning_time_sec, execution_time_sec;
+	SPIPlanPtr	plan;
+	int			ret;
+	TupleDesc	tupdesc;
+	Datum		values[2];
+	bool		nulls[2] = {false, false};
+	HeapTuple	rettuple;
+
+	sql_query_cstring = text_to_cstring(sql_query);
+
+	ret = SPI_connect();
+	if (ret != SPI_OK_CONNECT)
+		ereport(ERROR,
+			(errmsg("SPI_connect failed: %s", SPI_result_code_string(ret))));
+
+	/* Measure planning time */
+	start_time = GetCurrentTimestamp();
+	plan = SPI_prepare(sql_query_cstring, 0, NULL);
+	end_time = GetCurrentTimestamp();
+	planning_time_us = end_time - start_time;
+
+	if (plan == NULL) {
+		SPI_finish();
+		ereport(ERROR,
+			(errmsg("SPI_prepare failed: %s", SPI_result_code_string(SPI_result))));
+	}
+
+	/* Measure execution time */
+	start_time = GetCurrentTimestamp();
+	ret = SPI_execute_plan(plan, NULL, NULL, true, 0);
+	end_time = GetCurrentTimestamp();
+	execution_time_us = end_time - start_time;
+
+	if (ret < 0) {
+		SPI_freeplan(plan);
+		SPI_finish();
+		ereport(ERROR,
+			(errmsg("SPI_execute_plan failed: %s", SPI_result_code_string(ret))));
+	}
+
+	SPI_freeplan(plan);
+	SPI_finish();
+
+	/* Build result tuple */
+	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+		ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("function returning record called in context that cannot accept type record")));
+
+	/* Convert times to seconds */
+	planning_time_sec = (double)planning_time_us / 1e6;
+	execution_time_sec = (double)execution_time_us / 1e6;
+
+	/* Prepare the values */
+	values[0] = Float8GetDatum(planning_time_sec);
+	values[1] = Float8GetDatum(execution_time_sec);
+
+	/* Build the tuple */
+	rettuple = heap_form_tuple(tupdesc, values, nulls);
+
+	/* Return the result as a Datum */
+	PG_RETURN_DATUM(HeapTupleGetDatum(rettuple));
 }

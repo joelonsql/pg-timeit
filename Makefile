@@ -4,7 +4,8 @@ DATA = timeit--1.0.sql
 REGRESS = create_extension \
 	t \
 	eval \
-	pretty_time
+	pretty_time \
+	time_query
 EXTRA_CLEAN = timeit--1.0.sql
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -23,6 +24,7 @@ SQL_SRC = \
 	FUNCTIONS/measure_cycles.sql \
 	FUNCTIONS/overhead_time.sql \
 	FUNCTIONS/overhead_cycles.sql \
+	FUNCTIONS/time_query.sql \
 	FUNCTIONS/eval.sql \
 	FUNCTIONS/measure.sql \
 	FUNCTIONS/t.sql \
