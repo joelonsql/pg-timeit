@@ -525,7 +525,7 @@ overhead_cycles(PG_FUNCTION_ARGS)
  * SQL-callable function timeit.time_query().
  *
  * Executes the specified SQL query once,
- * and returns a record with the measured planning_time and execution_time.
+ * and returns planning time, execution time, and HPC data as record fields.
  */
 Datum
 time_query(PG_FUNCTION_ARGS)
@@ -538,14 +538,40 @@ time_query(PG_FUNCTION_ARGS)
 	SPIPlanPtr	plan;
 	int			ret;
 	TupleDesc	tupdesc;
-	Datum		values[6];  /* Updated to hold more values */
-	bool		nulls[6] = {false, false, false, false, false, false};
+	Datum		values[11];	/* Updated to hold more values */
+	bool		nulls[11];	/* Updated to match the number of values */
 	HeapTuple	rettuple;
 
 	/* Variables for performance counters */
 	struct perf_event_attr pe;
-	int fd_cycles = -1, fd_instructions = -1, fd_cache_references = -1, fd_cache_misses = -1;
-	long long count_cycles = 0, count_instructions = 0, count_cache_references = 0, count_cache_misses = 0;
+	int			num_events = 0;
+	int			i;
+	int		   *fds = NULL;
+	uint64	   *counts = NULL;
+
+	/* Initialize nulls array */
+	memset(nulls, 0, sizeof(nulls));
+
+	/* Define the list of events */
+	struct
+	{
+		const char *name;
+		__u64		config;
+	} events[] = {
+		{"cpu_cycles", PERF_COUNT_HW_CPU_CYCLES},
+		{"instructions", PERF_COUNT_HW_INSTRUCTIONS},
+		{"cache_references", PERF_COUNT_HW_CACHE_REFERENCES},
+		{"cache_misses", PERF_COUNT_HW_CACHE_MISSES},
+		{"branch_instructions", PERF_COUNT_HW_BRANCH_INSTRUCTIONS},
+		{"branch_misses", PERF_COUNT_HW_BRANCH_MISSES},
+		{"stalled_cycles_frontend", PERF_COUNT_HW_STALLED_CYCLES_FRONTEND},
+		{"stalled_cycles_backend", PERF_COUNT_HW_STALLED_CYCLES_BACKEND},
+		{"ref_cpu_cycles", PERF_COUNT_HW_REF_CPU_CYCLES}
+	};
+
+	num_events = sizeof(events) / sizeof(events[0]);
+	fds = palloc0(sizeof(int) * num_events);
+	counts = palloc0(sizeof(uint64) * num_events);
 
 	/* Initialize performance event attributes */
 	memset(&pe, 0, sizeof(struct perf_event_attr));
@@ -554,45 +580,22 @@ time_query(PG_FUNCTION_ARGS)
 	pe.disabled = 1;
 	pe.exclude_kernel = 1;
 	pe.exclude_hv = 1;
+	pe.read_format = PERF_FORMAT_GROUP | PERF_FORMAT_ID;
 
-	/* Open performance counter for counting cycles */
-	pe.config = PERF_COUNT_HW_CPU_CYCLES;
-	fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);
-	if (fd_cycles == -1)
-		ereport(ERROR,
-				(errmsg("Error opening perf_event for CPU cycles: %m")));
-
-	/* Open performance counter for instructions retired, grouped under cycles */
-	pe.config = PERF_COUNT_HW_INSTRUCTIONS;
-	fd_instructions = perf_event_open(&pe, 0, -1, fd_cycles, 0);
-	if (fd_instructions == -1)
+	/* Open performance counters */
+	for (i = 0; i < num_events; i++)
 	{
-		close(fd_cycles);
-		ereport(ERROR,
-				(errmsg("Error opening perf_event for instructions: %m")));
-	}
+		int group_fd = (i == 0) ? -1 : fds[0]; /* Group events under the first one */
+		pe.config = events[i].config;
 
-	/* Open performance counter for cache references */
-	pe.config = PERF_COUNT_HW_CACHE_REFERENCES;
-	fd_cache_references = perf_event_open(&pe, 0, -1, fd_cycles, 0);
-	if (fd_cache_references == -1)
-	{
-		close(fd_cycles);
-		close(fd_instructions);
-		ereport(ERROR,
-				(errmsg("Error opening perf_event for cache references: %m")));
-	}
-
-	/* Open performance counter for cache misses */
-	pe.config = PERF_COUNT_HW_CACHE_MISSES;
-	fd_cache_misses = perf_event_open(&pe, 0, -1, fd_cycles, 0);
-	if (fd_cache_misses == -1)
-	{
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		ereport(ERROR,
-				(errmsg("Error opening perf_event for cache misses: %m")));
+		fds[i] = perf_event_open(&pe, 0, -1, group_fd, 0);
+		if (fds[i] == -1)
+		{
+			/* Skip this event if it cannot be opened */
+			elog(WARNING, "Failed to open perf event %s: %m", events[i].name);
+			counts[i] = 0;
+			continue;
+		}
 	}
 
 	/* Convert SQL query from text to C string */
@@ -602,10 +605,9 @@ time_query(PG_FUNCTION_ARGS)
 	ret = SPI_connect();
 	if (ret != SPI_OK_CONNECT)
 	{
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
+		for (i = 0; i < num_events; i++)
+			if (fds[i] != -1)
+				close(fds[i]);
 		ereport(ERROR,
 				(errmsg("SPI_connect failed: %s", SPI_result_code_string(ret))));
 	}
@@ -619,26 +621,27 @@ time_query(PG_FUNCTION_ARGS)
 	if (plan == NULL)
 	{
 		SPI_finish();
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
+		for (i = 0; i < num_events; i++)
+			if (fds[i] != -1)
+				close(fds[i]);
 		ereport(ERROR,
 				(errmsg("SPI_prepare failed: %s", SPI_result_code_string(SPI_result))));
 	}
 
 	/* Start counting performance counters */
-	if (ioctl(fd_cycles, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP) == -1 ||
-		ioctl(fd_cycles, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
+	if (fds[0] != -1)
 	{
-		SPI_freeplan(plan);
-		SPI_finish();
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
-		ereport(ERROR,
-				(errmsg("Error starting perf_event counters: %m")));
+		if (ioctl(fds[0], PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP) == -1 ||
+			ioctl(fds[0], PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
+		{
+			SPI_freeplan(plan);
+			SPI_finish();
+			for (i = 0; i < num_events; i++)
+				if (fds[i] != -1)
+					close(fds[i]);
+			ereport(ERROR,
+					(errmsg("Error starting perf_event counters: %m")));
+		}
 	}
 
 	/* Measure execution time */
@@ -648,51 +651,66 @@ time_query(PG_FUNCTION_ARGS)
 	execution_time_us = end_time - start_time;
 
 	/* Stop counting performance counters */
-	if (ioctl(fd_cycles, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1)
+	if (fds[0] != -1)
 	{
-		SPI_freeplan(plan);
-		SPI_finish();
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
-		ereport(ERROR,
-				(errmsg("Error stopping perf_event counters: %m")));
+		if (ioctl(fds[0], PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1)
+		{
+			SPI_freeplan(plan);
+			SPI_finish();
+			for (i = 0; i < num_events; i++)
+				if (fds[i] != -1)
+					close(fds[i]);
+			ereport(ERROR,
+					(errmsg("Error stopping perf_event counters: %m")));
+		}
 	}
 
 	if (ret < 0)
 	{
 		SPI_freeplan(plan);
 		SPI_finish();
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
+		for (i = 0; i < num_events; i++)
+			if (fds[i] != -1)
+				close(fds[i]);
 		ereport(ERROR,
 				(errmsg("SPI_execute_plan failed: %s", SPI_result_code_string(ret))));
 	}
 
 	/* Read the performance counters */
-	if (read(fd_cycles, &count_cycles, sizeof(long long)) == -1 ||
-		read(fd_instructions, &count_instructions, sizeof(long long)) == -1 ||
-		read(fd_cache_references, &count_cache_references, sizeof(long long)) == -1 ||
-		read(fd_cache_misses, &count_cache_misses, sizeof(long long)) == -1)
+	if (fds[0] != -1)
 	{
-		SPI_freeplan(plan);
-		SPI_finish();
-		close(fd_cycles);
-		close(fd_instructions);
-		close(fd_cache_references);
-		close(fd_cache_misses);
-		ereport(ERROR,
-				(errmsg("Error reading perf_event counters: %m")));
+		ssize_t		read_bytes;
+		size_t		buf_size = sizeof(uint64) * (3 + num_events);
+		uint64	   *buf = palloc0(buf_size); /* nr, time_enabled, time_running, values... */
+
+		read_bytes = read(fds[0], buf, buf_size);
+		if (read_bytes == -1)
+		{
+			SPI_freeplan(plan);
+			SPI_finish();
+			for (i = 0; i < num_events; i++)
+				if (fds[i] != -1)
+					close(fds[i]);
+			pfree(buf);
+			ereport(ERROR,
+					(errmsg("Error reading perf_event counters: %m")));
+		}
+
+		for (i = 0; i < num_events; i++)
+		{
+			if (fds[i] != -1)
+				counts[i] = buf[3 + i];
+			else
+				counts[i] = 0; /* Event was not opened */
+		}
+
+		pfree(buf);
 	}
 
 	/* Close the file descriptors */
-	close(fd_cycles);
-	close(fd_instructions);
-	close(fd_cache_references);
-	close(fd_cache_misses);
+	for (i = 0; i < num_events; i++)
+		if (fds[i] != -1)
+			close(fds[i]);
 
 	/* Free the plan and disconnect from SPI manager */
 	SPI_freeplan(plan);
@@ -705,21 +723,29 @@ time_query(PG_FUNCTION_ARGS)
 				 errmsg("function returning record called in context that cannot accept type record")));
 
 	/* Convert times to seconds */
-	planning_time_sec = (double)planning_time_us / 1e6;
-	execution_time_sec = (double)execution_time_us / 1e6;
+	planning_time_sec = (double) planning_time_us / 1e6;
+	execution_time_sec = (double) execution_time_us / 1e6;
 
 	/* Prepare the values */
 	values[0] = Float8GetDatum(planning_time_sec);
 	values[1] = Float8GetDatum(execution_time_sec);
-	values[2] = Int64GetDatum(count_cycles);
-	values[3] = Int64GetDatum(count_instructions);
-	values[4] = Int64GetDatum(count_cache_references);
-	values[5] = Int64GetDatum(count_cache_misses);
+	values[2] = Int64GetDatum(counts[0]); /* cpu_cycles */
+	values[3] = Int64GetDatum(counts[1]); /* instructions */
+	values[4] = Int64GetDatum(counts[2]); /* cache_references */
+	values[5] = Int64GetDatum(counts[3]); /* cache_misses */
+	values[6] = Int64GetDatum(counts[4]); /* branch_instructions */
+	values[7] = Int64GetDatum(counts[5]); /* branch_misses */
+	values[8] = Int64GetDatum(counts[6]); /* stalled_cycles_frontend */
+	values[9] = Int64GetDatum(counts[7]); /* stalled_cycles_backend */
+	values[10] = Int64GetDatum(counts[8]); /* ref_cpu_cycles */
 
 	/* Build the tuple */
 	rettuple = heap_form_tuple(tupdesc, values, nulls);
 
+	/* Free allocated memory */
+	pfree(fds);
+	pfree(counts);
+
 	/* Return the result as a Datum */
 	PG_RETURN_DATUM(HeapTupleGetDatum(rettuple));
 }
-
