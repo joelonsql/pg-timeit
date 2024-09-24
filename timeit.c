@@ -9,6 +9,11 @@
 #include "utils/lsyscache.h"
 #include <sched.h>
 #include <unistd.h>
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <errno.h>
 
 PG_MODULE_MAGIC;
 
@@ -88,6 +93,8 @@ static void prepare_function_call(text *internal_function_name,
 								  FunctionCallInfo fcinfo,
 								  FunctionCallData *fcd);
 static void free_function_call_data(FunctionCallData *fcd);
+static int perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+						   int cpu, int group_fd, unsigned long flags);
 
 PG_FUNCTION_INFO_V1(eval);
 PG_FUNCTION_INFO_V1(measure_time);
@@ -95,6 +102,13 @@ PG_FUNCTION_INFO_V1(measure_cycles);
 PG_FUNCTION_INFO_V1(overhead_time);
 PG_FUNCTION_INFO_V1(overhead_cycles);
 PG_FUNCTION_INFO_V1(time_query);
+
+static int
+perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+				int cpu, int group_fd, unsigned long flags)
+{
+	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+}
 
 static Oid
 lookup_internal_function(char *internal_function_name_c_string)
@@ -510,12 +524,13 @@ overhead_cycles(PG_FUNCTION_ARGS)
 /*
  * SQL-callable function timeit.time_query().
  *
- * Executes the specified SQL query once, and returns a record with the
- * measured planning_time and execution_time.
+ * Executes the specified SQL query once,
+ * and returns a record with the measured planning_time and execution_time.
  */
 Datum
-time_query(PG_FUNCTION_ARGS) {
-	text 	   *sql_query = PG_GETARG_TEXT_P(0);
+time_query(PG_FUNCTION_ARGS)
+{
+	text	   *sql_query = PG_GETARG_TEXT_P(0);
 	char	   *sql_query_cstring;
 	TimestampTz start_time, end_time;
 	int64		planning_time_us, execution_time_us;
@@ -523,16 +538,77 @@ time_query(PG_FUNCTION_ARGS) {
 	SPIPlanPtr	plan;
 	int			ret;
 	TupleDesc	tupdesc;
-	Datum		values[2];
-	bool		nulls[2] = {false, false};
+	Datum		values[6];  /* Updated to hold more values */
+	bool		nulls[6] = {false, false, false, false, false, false};
 	HeapTuple	rettuple;
 
+	/* Variables for performance counters */
+	struct perf_event_attr pe;
+	int fd_cycles = -1, fd_instructions = -1, fd_cache_references = -1, fd_cache_misses = -1;
+	long long count_cycles = 0, count_instructions = 0, count_cache_references = 0, count_cache_misses = 0;
+
+	/* Initialize performance event attributes */
+	memset(&pe, 0, sizeof(struct perf_event_attr));
+	pe.type = PERF_TYPE_HARDWARE;
+	pe.size = sizeof(struct perf_event_attr);
+	pe.disabled = 1;
+	pe.exclude_kernel = 1;
+	pe.exclude_hv = 1;
+
+	/* Open performance counter for counting cycles */
+	pe.config = PERF_COUNT_HW_CPU_CYCLES;
+	fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);
+	if (fd_cycles == -1)
+		ereport(ERROR,
+				(errmsg("Error opening perf_event for CPU cycles: %m")));
+
+	/* Open performance counter for instructions retired, grouped under cycles */
+	pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+	fd_instructions = perf_event_open(&pe, 0, -1, fd_cycles, 0);
+	if (fd_instructions == -1)
+	{
+		close(fd_cycles);
+		ereport(ERROR,
+				(errmsg("Error opening perf_event for instructions: %m")));
+	}
+
+	/* Open performance counter for cache references */
+	pe.config = PERF_COUNT_HW_CACHE_REFERENCES;
+	fd_cache_references = perf_event_open(&pe, 0, -1, fd_cycles, 0);
+	if (fd_cache_references == -1)
+	{
+		close(fd_cycles);
+		close(fd_instructions);
+		ereport(ERROR,
+				(errmsg("Error opening perf_event for cache references: %m")));
+	}
+
+	/* Open performance counter for cache misses */
+	pe.config = PERF_COUNT_HW_CACHE_MISSES;
+	fd_cache_misses = perf_event_open(&pe, 0, -1, fd_cycles, 0);
+	if (fd_cache_misses == -1)
+	{
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		ereport(ERROR,
+				(errmsg("Error opening perf_event for cache misses: %m")));
+	}
+
+	/* Convert SQL query from text to C string */
 	sql_query_cstring = text_to_cstring(sql_query);
 
+	/* Connect to SPI manager */
 	ret = SPI_connect();
 	if (ret != SPI_OK_CONNECT)
+	{
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
 		ereport(ERROR,
-			(errmsg("SPI_connect failed: %s", SPI_result_code_string(ret))));
+				(errmsg("SPI_connect failed: %s", SPI_result_code_string(ret))));
+	}
 
 	/* Measure planning time */
 	start_time = GetCurrentTimestamp();
@@ -540,10 +616,29 @@ time_query(PG_FUNCTION_ARGS) {
 	end_time = GetCurrentTimestamp();
 	planning_time_us = end_time - start_time;
 
-	if (plan == NULL) {
+	if (plan == NULL)
+	{
 		SPI_finish();
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
 		ereport(ERROR,
-			(errmsg("SPI_prepare failed: %s", SPI_result_code_string(SPI_result))));
+				(errmsg("SPI_prepare failed: %s", SPI_result_code_string(SPI_result))));
+	}
+
+	/* Start counting performance counters */
+	if (ioctl(fd_cycles, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP) == -1 ||
+		ioctl(fd_cycles, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
+	{
+		SPI_freeplan(plan);
+		SPI_finish();
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
+		ereport(ERROR,
+				(errmsg("Error starting perf_event counters: %m")));
 	}
 
 	/* Measure execution time */
@@ -552,21 +647,62 @@ time_query(PG_FUNCTION_ARGS) {
 	end_time = GetCurrentTimestamp();
 	execution_time_us = end_time - start_time;
 
-	if (ret < 0) {
+	/* Stop counting performance counters */
+	if (ioctl(fd_cycles, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1)
+	{
 		SPI_freeplan(plan);
 		SPI_finish();
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
 		ereport(ERROR,
-			(errmsg("SPI_execute_plan failed: %s", SPI_result_code_string(ret))));
+				(errmsg("Error stopping perf_event counters: %m")));
 	}
 
+	if (ret < 0)
+	{
+		SPI_freeplan(plan);
+		SPI_finish();
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
+		ereport(ERROR,
+				(errmsg("SPI_execute_plan failed: %s", SPI_result_code_string(ret))));
+	}
+
+	/* Read the performance counters */
+	if (read(fd_cycles, &count_cycles, sizeof(long long)) == -1 ||
+		read(fd_instructions, &count_instructions, sizeof(long long)) == -1 ||
+		read(fd_cache_references, &count_cache_references, sizeof(long long)) == -1 ||
+		read(fd_cache_misses, &count_cache_misses, sizeof(long long)) == -1)
+	{
+		SPI_freeplan(plan);
+		SPI_finish();
+		close(fd_cycles);
+		close(fd_instructions);
+		close(fd_cache_references);
+		close(fd_cache_misses);
+		ereport(ERROR,
+				(errmsg("Error reading perf_event counters: %m")));
+	}
+
+	/* Close the file descriptors */
+	close(fd_cycles);
+	close(fd_instructions);
+	close(fd_cache_references);
+	close(fd_cache_misses);
+
+	/* Free the plan and disconnect from SPI manager */
 	SPI_freeplan(plan);
 	SPI_finish();
 
 	/* Build result tuple */
 	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
 		ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			 errmsg("function returning record called in context that cannot accept type record")));
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("function returning record called in context that cannot accept type record")));
 
 	/* Convert times to seconds */
 	planning_time_sec = (double)planning_time_us / 1e6;
@@ -575,6 +711,10 @@ time_query(PG_FUNCTION_ARGS) {
 	/* Prepare the values */
 	values[0] = Float8GetDatum(planning_time_sec);
 	values[1] = Float8GetDatum(execution_time_sec);
+	values[2] = Int64GetDatum(count_cycles);
+	values[3] = Int64GetDatum(count_instructions);
+	values[4] = Int64GetDatum(count_cache_references);
+	values[5] = Int64GetDatum(count_cache_misses);
 
 	/* Build the tuple */
 	rettuple = heap_form_tuple(tupdesc, values, nulls);
@@ -582,3 +722,4 @@ time_query(PG_FUNCTION_ARGS) {
 	/* Return the result as a Datum */
 	PG_RETURN_DATUM(HeapTupleGetDatum(rettuple));
 }
+
